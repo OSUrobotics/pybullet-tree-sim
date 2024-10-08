@@ -411,9 +411,9 @@ class PruningEnv(gym.Env):
             title="World Coordinates",
             scene=dict(
                 aspectmode='cube',
-                xaxis=dict(range=[-1.0, 1.0]),
-                yaxis=dict(range=[-0.1, 2.0]),
-                zaxis=dict(range=[-0.0, 2.1]),
+                # xaxis=dict(range=[-1.0, 1.0]),
+                # yaxis=dict(range=[-0.1, 2.0]),
+                # zaxis=dict(range=[-0.0, 2.1]),
             ),
 
         )
@@ -431,7 +431,7 @@ def main():
     cam_width = 8
 
     pbutils = PyBUtils(renders=True, cam_width=cam_width, cam_height=cam_height, dfov=cam_dfov)
-    penv = PruningEnv(pbutils=pbutils, load_robot=True, robot_pos=[0, 1, 0], verbose=True, cam_width=cam_width, cam_height=cam_height)
+    penv = PruningEnv(pbutils=pbutils, load_robot=True, robot_pos=[0,1,0], verbose=True, cam_width=cam_width, cam_height=cam_height)
     penv.load_tree(
         pbutils=pbutils,
         scale=1.0,
@@ -451,7 +451,8 @@ def main():
     data = data.reshape((cam_width * cam_height, 1), order="F")
     # log.warning(f"data:\n{data}")
     #
-
+    
+    log.warning(f"joint angles: {penv.ur5.get_joint_angles()}")
     point_cloud = penv.deproject_pixels_to_points(data=data)
 
 
