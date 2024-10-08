@@ -12,6 +12,8 @@ import pybullet
 from nptyping import NDArray, Shape, Float
 from collections import namedtuple
 
+from zenlog import log
+
 
 # ENV is a collection of objects like tree supports and ur5 robot. They interact with each other
 # through the env. UR5 class only needs access to pybullet.
@@ -50,6 +52,7 @@ class UR5:
         self.verbose = verbose
 
         self.setup_ur5_arm()  # Changes pos and orientation if randomize is True
+        return
 
     def setup_ur5_arm(self) -> None:
         assert self.ur5_robot is None
@@ -65,6 +68,8 @@ class UR5:
         else:
             delta_pos = np.array([0.0, 0.0, 0.0])
             delta_orientation = pybullet.getQuaternionFromEuler([0, 0, 0])
+            
+        
 
         self.pos, self.orientation = self.con.multiplyTransforms(
             self.init_pos, self.init_orientation, delta_pos, delta_orientation
@@ -137,6 +142,7 @@ class UR5:
         self.achieved_pos = np.array(self.get_current_pose(self.end_effector_index)[0])
         base_pos, base_or = self.get_current_pose(self.base_index)
         self.set_collision_filter()
+        return
 
     def reset_ur5_arm(self) -> None:
         if self.ur5_robot is None:
@@ -145,12 +151,14 @@ class UR5:
         for i, name in enumerate(self.control_joints):
             joint_id = self.joints[name].id
             self.con.resetJointState(self.ur5_robot, joint_id, self.init_joint_angles[i], targetVelocity=0)
+        return
 
     def set_joint_angles_no_collision(self, joint_angles: Tuple[float, float, float, float, float, float]) -> None:
         for i, name in enumerate(self.control_joints):
             joint = self.joints[name]
             # print(name, joint_angles[i])
             self.con.resetJointState(self.ur5_robot, joint.id, joint_angles[i], targetVelocity=0)
+        return
 
     def set_collision_filter(self):
         # TO SET CUTTER DISABLE COLLISIONS WITH SELF

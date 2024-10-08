@@ -11,16 +11,23 @@ authors = [
     { name = "Abhinav Jain", email = "jainab@oregonstate.edu" },
     { name = "Luke Strohbehn", email = "luke.strohbehn@gmail.com" },
 ]
-maintainers = [{ name = "Luke Strohbehn", email = "luke.strohbehn@gmail.com" }]
+maintainers = [
+    { name = "Abhinav Jain", email = "jainab@oregonstate.edu" },
+    { name = "Luke Strohbehn", email = "luke.strohbehn@gmail.com" },
+]
 description = "A PyBullet package for simulating trees with the UR5 arm."
 requires-python = ">=3.8"
 dependencies = [
     "gymnasium",
+    "modern_robotics",
     "numpy==1.26.4",
+    "nptyping",
     "opencv-python",
     "pandas",
+    "plotly",
     "pybullet==3.2.6",
     "pywavefront",
     "scikit-image",
     "xacro",
+    "zenlog",
 ]
