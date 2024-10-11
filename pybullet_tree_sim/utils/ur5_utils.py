@@ -4,6 +4,7 @@ import sys
 from typing import Optional, Tuple
 
 from numpy import ndarray
+from scipy.spatial.transform import Rotation
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.pardir)))
 import numpy as np
@@ -29,6 +30,7 @@ class UR5:
         self.pos = pos
         self.orientation = orientation
         self.randomize_pose = randomize_pose
+        # TODO: Add end-effector, frames, etc. dynamically (dict)
         self.tool0_link_index = None
         self.end_effector_index = None
         self.success_link_index = None
@@ -56,6 +58,8 @@ class UR5:
 
     def setup_ur5_arm(self) -> None:
         assert self.ur5_robot is None
+        # TODO: Dynamically add end-effectors, frames
+
         self.tool0_link_index = 8
         self.end_effector_index = 13
         self.success_link_index = 14
@@ -68,14 +72,13 @@ class UR5:
         else:
             delta_pos = np.array([0.0, 0.0, 0.0])
             delta_orientation = pybullet.getQuaternionFromEuler([0, 0, 0])
-            
-        
 
         self.pos, self.orientation = self.con.multiplyTransforms(
             self.init_pos, self.init_orientation, delta_pos, delta_orientation
         )
         self.ur5_robot = self.con.loadURDF(self.robot_urdf_path, self.pos, self.orientation, flags=flags)
 
+        # TODO: Dynamically add end-effectors
         self.num_joints = self.con.getNumJoints(self.ur5_robot)
         self.control_joints = [
             "shoulder_pan_joint",
@@ -130,7 +133,7 @@ class UR5:
             -np.pi / 2,
             np.pi,
         )  # (-np.pi/2, -np.pi/6, np.pi*2/3, -np.pi*3/2, -np.pi/2, np.pi)#
-        self.set_joint_angles(self.init_joint_angles)
+        self.set_joint_angles_no_collision(self.init_joint_angles)
         for _ in range(100):
             self.con.stepSimulation()
 
@@ -142,6 +145,13 @@ class UR5:
         self.achieved_pos = np.array(self.get_current_pose(self.end_effector_index)[0])
         base_pos, base_or = self.get_current_pose(self.base_index)
         self.set_collision_filter()
+
+        eef_pos, eef_or = self.get_current_pose(self.end_effector_index)
+        # log.warning(f"ur_joints: {self.joint_angles}")
+        # log.warning(f"base_pos: {base_pos}, base_or: {base_or}")
+        # log.warning(f"eef_pos: {eef_pos}, eef_or: {eef_or}")
+        #
+        log.debug(self.joint_info)
         return
 
     def reset_ur5_arm(self) -> None:
@@ -261,12 +271,12 @@ class UR5:
 
         return singularity
 
-    def get_joint_velocities(self):
+    def get_joint_velocities(self) -> tuple:
         j = self.con.getJointStates(self.ur5_robot, [3, 4, 5, 6, 7, 8])
         joints = tuple((i[1] for i in j))
         return joints  # type: ignore
 
-    def calculate_jacobian(self):
+    def calculate_jacobian(self) -> np.ndarray:
         jacobian = self.con.calculateJacobian(
             self.ur5_robot,
             self.tool0_link_index,
@@ -352,7 +362,7 @@ class UR5:
 
     def calculate_ik(
         self, position: Tuple[float, float, float], orientation: Optional[Tuple[float, float, float, float]]
-    ) -> Tuple[float, float, float, float, float, float]:
+    ) -> tuple:
         """Calculates joint angles from end effector position and orientation using inverse kinematics"""
         lower_limits = [-np.pi] * 6
         upper_limits = [np.pi] * 6
@@ -391,6 +401,8 @@ class UR5:
 
         ee_transform = np.identity(4)
         ee_rot_mat = np.array(self.con.getMatrixFromQuaternion(orientation)).reshape(3, 3)
+        log.debug(f"EE Rot Mat:\n{ee_rot_mat}")
+
         ee_transform[:3, :3] = ee_rot_mat
         ee_transform[:3, 3] = pos
 
@@ -409,18 +421,22 @@ class UR5:
     def get_view_mat_at_curr_pose(self, pan, tilt, xyz_offset) -> np.ndarray:
         """Get view matrix at current pose"""
         pose, orientation = self.get_current_pose(self.tool0_link_index)
+        # log.debug(f"tool0 Pose: {pose}, Orientation: {Rotation.from_quat(orientation).as_euler('xyz')}")
 
         camera_tf = self.create_camera_transform(pose, orientation, pan, tilt, xyz_offset)
 
         # Initial vectors
         camera_vector = np.array([0, 0, 1]) @ camera_tf[:3, :3].T  #
         up_vector = np.array([0, 1, 0]) @ camera_tf[:3, :3].T  #
-        # Rotated vectors
-        # print(camera_vector, up_vector)
+
+        log.debug(f"cam vec, up vec:\n{camera_vector}, {up_vector}")
+
         view_matrix = self.con.computeViewMatrix(camera_tf[:3, 3], camera_tf[:3, 3] + 0.1 * camera_vector, up_vector)
         return view_matrix
 
-    def get_camera_location(self):
+    def get_camera_location(
+        self, tf_name: str
+    ):  # TODO: get transform from dictionary. choose between rgb or tof frames
         pose, orientation = self.get_current_pose(self.tool0_link_index)
         tilt = np.pi / 180 * 8
 

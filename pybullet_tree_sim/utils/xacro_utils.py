@@ -6,6 +6,7 @@ import xml.dom.minidom
 
 from zenlog import log
 
+
 def load_urdf_from_xacro(xacro_path: str, mappings: dict | None = None) -> xml.dom.minidom.Document | TextIOWrapper:
     # TODO: if urdf_path not used, add step to load existing file.
     urdf_content = xacro.process_file(input_file_name=xacro_path, mappings=mappings)
