@@ -110,13 +110,14 @@ class PruningEnv(gym.Env):
         self.cam_tilt = 0
         # self.cam_xyz_offset = np.zeros(3)
         self.cam_xyz_offset = np.array([0, 0, 0])
-        # Normalize pixel coordinates
 
         # Camera stuff
-        self.pixel_coords = np.array(list(np.ndindex((cam_width, cam_height))), dtype=int) # C-style
+        self.pixel_coords = np.array(list(np.ndindex((cam_width, cam_height))), dtype=int)  # C-style
         # Find the pixel coordinates in the film plane. Bin, offset, normalize, then scale to [-1, 1]
         self.film_plane_coords = np.zeros((cam_width, cam_height, 2), dtype=float)
-        self.film_plane_coords = 2 * np.divide(np.subtract(np.add(self.pixel_coords, [0.5, 0.5]), [cam_width/2, cam_height/2]), [cam_width, cam_height])
+        self.film_plane_coords = 2 * np.divide(
+            np.subtract(np.add(self.pixel_coords, [0.5, 0.5]), [cam_width / 2, cam_height / 2]), [cam_width, cam_height]
+        )
 
         self.verbose = verbose
 
@@ -217,7 +218,6 @@ class PruningEnv(gym.Env):
             tree.pyb_tree_id = self.pbutils.pbclient.loadURDF(tree.urdf_path, useFixedBase=True)
             log.info(f"Tree {tree.id_str} activated with PyBID {tree.pyb_tree_id}")
 
-        # Activate support posts around the tree
         if include_support_posts:
             self.activate_support_posts(associated_tree=tree)
         return
@@ -268,38 +268,40 @@ class PruningEnv(gym.Env):
 
         https://ksimek.github.io/2013/08/13/intrinsic/
         https://gachiemchiep.github.io/cheatsheet/camera_calibration/
+        https://stackoverflow.com/questions/4124041/is-opengl-coordinate-system-left-handed-or-right-handed
 
         @param data: 2D array of depth values
 
         TODO: change all `reshape` to `resize`
         """
+
         # Get view and projection matrices
         view_matrix = np.asarray(
             self.ur5.get_view_mat_at_curr_pose(pan=self.cam_pan, tilt=self.cam_tilt, xyz_offset=self.cam_xyz_offset)
         ).reshape([4, 4], order="F")
-        # log.debug(view_matrix)
-        # log.warning(self.pbutils.proj_mat)
+        log.debug(f"View matrix:\n{view_matrix}")
+
+        # Flip the y and z axes to convert from OpenGL camera frame to standard camera frame.
+        # https://stackoverflow.com/questions/4124041/is-opengl-coordinate-system-left-handed-or-right-handed
+        # https://github.com/bitlw/LearnProjMatrix/blob/main/doc/OpenGL_Projection.md#introduction
+        view_matrix[1:3, :] = -view_matrix[1:3, :]
         proj_matrix = np.asarray(self.pbutils.proj_mat).reshape([4, 4], order="F")
 
         # Get camera intrinsics from projection matrix
         fx = proj_matrix[0, 0]
-        fy = proj_matrix[1, 1] # if square camera, these should be the same
+        fy = proj_matrix[1, 1]  # if square camera, these should be the same
 
-        # Get camera coordinates from film-plane coordinates. Scale, add z (depth), then homogenize the matrix
+        # Get camera coordinates from film-plane coordinates. Scale, add z (depth), then homogenize the matrix.
         cam_coords = np.divide(np.multiply(self.film_plane_coords, data), [fx, fy])
         cam_coords = np.concatenate((cam_coords, data, np.ones((self.cam_width * self.cam_height, 1))), axis=1)
 
-        # Get world coordinates from camera coordinates
         world_coords = (mr.TransInv(view_matrix) @ cam_coords.T).T
 
-        plot=True
+        plot = True
         if plot:
             self.debug_plots(data=data, cam_coords=cam_coords, world_coords=world_coords, view_matrix=view_matrix)
 
         return world_coords
-
-
-
 
     def compute_deprojected_point_mask(self):
         # TODO: Make this function nicer
@@ -309,7 +311,7 @@ class PruningEnv(gym.Env):
 
         # proj_matrix = np.asarray(self.pbutils.proj_mat).reshape([4, 4], order="F")
         # view_matrix = np.asarray(
-            # self.ur5.get_view_mat_at_curr_pose(pan=self.cam_pan, tilt=self.cam_tilt, xyz_offset=self.cam_xyz_offset)
+        # self.ur5.get_view_mat_at_curr_pose(pan=self.cam_pan, tilt=self.cam_tilt, xyz_offset=self.cam_xyz_offset)
         # ).reshape([4, 4], order="F")
         # projection = (
         #     proj_matrix
@@ -374,50 +376,128 @@ class PruningEnv(gym.Env):
 
     def debug_plots(self, data, cam_coords, world_coords, view_matrix):
         import plotly.graph_objects as go
+
+        hovertemplate = "id: %{id}<br>x: %{x}<br>y: %{y}<br>z: %{z}<extra></extra>"
+
         _data = data.reshape([self.cam_width, self.cam_height], order="F")
         _data = _data.reshape((self.cam_width * self.cam_height, 1), order="C")
         fig = go.Figure(
-            data=[go.Scatter3d(
-                x=list(range(8)) * 8,
-                y=np.array([list(range(8))] * 8).T.flatten(order='C'),
-                z=_data.flatten(order='C'),
-                mode='markers'
-            )]
+            data=[
+                go.Scatter3d(
+                    x=list(range(8)) * 8,
+                    y=np.array([list(range(8))] * 8).T.flatten(order="C"),
+                    z=_data.flatten(order="C"),
+                    mode="markers",
+                    ids=np.array([f"{i}" for i in range(self.cam_width * self.cam_height)])
+                    .reshape((8, 8), order="C")
+                    .flatten(order="F"),
+                    hovertemplate=hovertemplate,
+                )
+            ]
         )
         fig.update_layout(
-            title="Pixel Coordinates"
+            title="Pixel Coordinates",
+            scene=dict(
+                aspectmode="cube",
+                camera=dict(
+                    up=dict(x=0, y=0, z=1),
+                    center=dict(x=0, y=0, z=0),
+                    eye=dict(x=-1.25, y=-1.25, z=1.25),
+                ),
+            ),
         )
         fig.show()
-        fig = go.Figure(data=[go.Scatter3d(x=self.film_plane_coords[:,0], y=self.film_plane_coords[:,1], z=data.flatten(order="F"), mode='markers')])
+        fig = go.Figure(
+            data=[
+                go.Scatter3d(
+                    x=self.film_plane_coords[:, 0],
+                    y=self.film_plane_coords[:, 1],
+                    z=data.flatten(order="F"),
+                    mode="markers",
+                    ids=[f"{i}" for i in range(self.cam_width * self.cam_height)],
+                    hovertemplate=hovertemplate,
+                )
+            ]
+        )
         fig.update_layout(
-            title="Film Coordinates"
+            title="Film Coordinates",
+            scene=dict(
+                aspectmode="cube",
+                camera=dict(
+                    up=dict(x=0, y=0, z=1),
+                    center=dict(x=0, y=0, z=0),
+                    eye=dict(x=-1.25, y=-1.25, z=1.25),
+                ),
+            ),
         )
         fig.show()
-        fig = go.Figure(data=[go.Scatter3d(x=cam_coords[:,0], y=cam_coords[:,1], z=cam_coords[:,2], mode='markers')])
+        fig = go.Figure(
+            data=[
+                go.Scatter3d(
+                    x=cam_coords[:, 0],
+                    y=cam_coords[:, 1],
+                    z=cam_coords[:, 2],
+                    mode="markers",
+                    ids=[f"{i}" for i in range(self.cam_width * self.cam_height)],
+                    hovertemplate=hovertemplate,
+                )
+            ]
+        )  # reverse sign of z to match world coords
         fig.update_layout(
             title="Camera Coordinates",
             scene=dict(
-                aspectmode='cube',
+                aspectmode="cube",
+                camera=dict(
+                    up=dict(x=0, y=0, z=1),
+                    center=dict(x=0, y=0, z=0),
+                    eye=dict(x=-1.25, y=-1.25, z=1.25),
+                ),
             ),
         )
         fig.show()
-        fig = go.Figure(data=[go.Scatter3d(x=world_coords[:,0], y=world_coords[:,1], z=world_coords[:,2], mode='markers', marker=dict(
-            size=2
-        ))])
-        inv_view_matrix = np.linalg.inv(view_matrix)
-        print(inv_view_matrix[0,3], inv_view_matrix[1,3], inv_view_matrix[2,3])
-        fig.add_trace(go.Scatter3d(x=[inv_view_matrix[0,3]], y=[inv_view_matrix[1,3]], z=[inv_view_matrix[2,3]], mode='markers', name="camera_origin", marker=dict(size=5)))
+        fig = go.Figure(
+            data=[
+                go.Scatter3d(
+                    x=world_coords[:, 0],
+                    y=world_coords[:, 1],
+                    z=world_coords[:, 2],
+                    name="tof_data",
+                    mode="markers",
+                    marker=dict(size=10),
+                    ids=np.array([f"{i}" for i in range(self.cam_width * self.cam_height)]),
+                    hovertemplate=hovertemplate,
+                )
+            ]
+        )
+        inv_view_matrix = mr.TransInv(view_matrix)
+        fig.add_trace(
+            go.Scatter3d(
+                x=[inv_view_matrix[0, 3]],
+                y=[inv_view_matrix[1, 3]],
+                z=[inv_view_matrix[2, 3]],
+                mode="markers",
+                name="camera_origin",
+                marker=dict(size=5),
+            )
+        )
         fig.update_layout(
             title="World Coordinates",
             scene=dict(
-                aspectmode='cube',
+                aspectmode="cube",
                 # xaxis=dict(range=[-1.0, 1.0]),
-                # yaxis=dict(range=[-0.1, 2.0]),
+                # yaxis=dict(range=[-0.1, 1.0]),
                 # zaxis=dict(range=[-0.0, 2.1]),
+                camera=dict(
+                    up=dict(x=0, y=0, z=1),
+                    center=dict(x=0, y=0, z=0),
+                    eye=dict(x=-1.5, y=-1.5, z=1.5),
+                ),
             ),
-
         )
         fig.show()
+
+        # log.warn(f"view_matrix: {view_matrix}")
+        # log.warn(f"inv_view_matrix: {inv_view_matrix}")
         return
 
 
@@ -431,7 +511,9 @@ def main():
     cam_width = 8
 
     pbutils = PyBUtils(renders=True, cam_width=cam_width, cam_height=cam_height, dfov=cam_dfov)
-    penv = PruningEnv(pbutils=pbutils, load_robot=True, robot_pos=[0,1,0], verbose=True, cam_width=cam_width, cam_height=cam_height)
+    penv = PruningEnv(
+        pbutils=pbutils, load_robot=True, robot_pos=[0, 1, 0], verbose=True, cam_width=cam_width, cam_height=cam_height
+    )
     penv.load_tree(
         pbutils=pbutils,
         scale=1.0,
@@ -442,23 +524,25 @@ def main():
         save_tree_urdf=False,
         # randomize_pose=True
     )
-    # penv.activate_tree(tree_id_str="LPy_envy_tree1")
+    penv.activate_tree(tree_id_str="LPy_envy_tree1")
 
     data = np.zeros((cam_width, cam_height), dtype=float)
     generator = np.random.default_rng(seed=secrets.randbits(128))
     # data[0,0] = 0.31
-    data[:,3:5] = tuple(generator.uniform(0.31, 0.35, (cam_height, 2)))
+    # data[:, 3:5] = tuple(generator.uniform(0.31, 0.35, (cam_height, 2)))
+
+    start = 0.31
+    stop = 0.35
+    data[:, 3:5] = np.array([np.arange(start, stop, (stop - start) / 8), np.arange(start, stop, (stop - start) / 8)]).T
+    data[-1, 3] = 0.31
     data = data.reshape((cam_width * cam_height, 1), order="F")
-    # log.warning(f"data:\n{data}")
-    #
-    
-    log.warning(f"joint angles: {penv.ur5.get_joint_angles()}")
+
+    # log.warning(f"joint angles: {penv.ur5.get_joint_angles()}")
+    log.debug(f'joints: {penv.ur5.joints}')
     point_cloud = penv.deproject_pixels_to_points(data=data)
 
-
-    # log.info(f"Point mask: {point_mask}")
-    time.sleep(30)
-    # penv.deactivate_tree(tree_id_str="LPy_envy_tree1")
+    # time.sleep(30)
+    penv.deactivate_tree(tree_id_str="LPy_envy_tree1")
     # time.sleep(3)
 
     return

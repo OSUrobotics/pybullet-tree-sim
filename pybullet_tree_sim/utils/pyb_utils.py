@@ -14,6 +14,9 @@ from scipy.constants import g as grav
 from pybullet_tree_sim import MESHES_PATH, URDF_PATH, TEXTURES_PATH
 from pybullet_tree_sim.utils.helpers import get_fov_from_dfov
 
+from zenlog import log
+
+
 class PyBUtils:
     def __init__(self, renders: bool = False, cam_height: int = 224, cam_width: int = 224, dfov: int = None) -> None:
         self.viz_view_matrix = None
@@ -24,8 +27,6 @@ class PyBUtils:
         self.near_val = 0.02
         self.far_val = 4.0
         self.step_time = 1 / 4
-
-
 
         # Debug parameters
         self.debug_items_step = []
@@ -50,8 +51,9 @@ class PyBUtils:
 
         self.pbclient.setTimeStep(self.step_time)
         # self.enable_gravity()
+        self.disable_gravity()
         self.pbclient.setRealTimeSimulation(False)
-        self.proj_mat = self.pbclient.computeProjectionMatrixFOV( # pass in the VERTICAL field of view.
+        self.proj_mat = self.pbclient.computeProjectionMatrixFOV(  # pass in the VERTICAL field of view.
             fov=self.fov[0], aspect=self.cam_width / self.cam_height, nearVal=self.near_val, farVal=self.far_val
         )
 
@@ -64,10 +66,12 @@ class PyBUtils:
 
     def disable_gravity(self):
         self.pbclient.setGravity(0, 0, 0)
+        log.info("Gravity disabled.")
         return
 
     def enable_gravity(self):
         self.pbclient.setGravity(0, 0, -grav)
+        log.info(f"Gravity enabled ({-grav} m/s^2).")
         return
 
     def create_wall_with_texture(self, wall_dim: List, wall_pos: List, euler_rotation: List, wall_texture: int):

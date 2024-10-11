@@ -12,6 +12,7 @@ def compute_perpendicular_projection_vector(ab: NDArray[Shape["3, 1"], Float], b
 def get_dfov_from_fov(fov: tuple):
     return
 
+
 def get_fov_from_dfov(camera_width, camera_height, dFoV):
     """
     Returns the vertical and horizontal field of view (FoV) in degrees given the diagonal field of view (dFoV) in degrees.
@@ -19,11 +20,10 @@ def get_fov_from_dfov(camera_width, camera_height, dFoV):
     https://www.scratchapixel.com/lessons/3d-basic-rendering/perspective-and-orthographic-projection-matrix/opengl-perspective-projection-matrix.html
     """
     _dfov = np.deg2rad(dFoV)
-    camera_diag = np.sqrt(camera_width**2 + camera_height**2)
+    camera_diag = np.sqrt(camera_width ** 2 + camera_height ** 2)
     fov_h = 2 * np.arctan(np.tan(_dfov / 2) * camera_height / camera_diag)
     fov_w = 2 * np.arctan(np.tan(_dfov / 2) * camera_width / camera_diag)
     return (np.rad2deg(fov_w), np.rad2deg(fov_h))
-
 
 
 if __name__ == "__main__":
