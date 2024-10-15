@@ -52,7 +52,7 @@ class Tree:
     """
 
     _tree_xacro_path = os.path.join(URDF_PATH, "trees", "envy", "tree.urdf.xacro")
-    _tree_saved_urdf_path = os.path.join(URDF_PATH, "trees", "envy", "generated")
+    _tree_generated_urdf_path = os.path.join(URDF_PATH, "trees", "envy", "generated")
     _tree_meshes_unlabeled_path = os.path.join(MESHES_PATH, "trees", "envy", "unlabeled", "obj")
     _tree_meshes_labeled_path = os.path.join(MESHES_PATH, "trees", "envy", "labeled", "obj")
     _pkl_path = PKL_PATH
@@ -444,9 +444,13 @@ class Tree:
                 raise TreeException(
                     "If parameter 'tree_urdf_path' is not provided, namespace, type, and id must be provided."
                 )
-            urdf_path = os.path.join(Tree._tree_saved_urdf_path, f"{namespace}{tree_type}_tree{tree_id}.urdf")
+            urdf_path = os.path.join(Tree._tree_generated_urdf_path, f"{namespace}{tree_type}_tree{tree_id}.urdf")
             if not os.path.exists(urdf_path):
                 log.info(f"Could not find file '{urdf_path}'. Generating URDF from xacro.")
+                
+                if not os.path.isdir(Tree._tree_generated_urdf_path):
+                    os.mkdir(Tree._tree_generated_urdf_path)
+                
                 urdf_mappings = {
                     "namespace": namespace,
                     "tree_id": str(tree_id),
