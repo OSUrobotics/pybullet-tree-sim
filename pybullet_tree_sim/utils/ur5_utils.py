@@ -401,7 +401,7 @@ class UR5:
 
         ee_transform = np.identity(4)
         ee_rot_mat = np.array(self.con.getMatrixFromQuaternion(orientation)).reshape(3, 3)
-        log.debug(f"EE Rot Mat:\n{ee_rot_mat}")
+        # log.debug(f"EE Rot Mat:\n{ee_rot_mat}")
 
         ee_transform[:3, :3] = ee_rot_mat
         ee_transform[:3, 3] = pos
@@ -429,7 +429,7 @@ class UR5:
         camera_vector = np.array([0, 0, 1]) @ camera_tf[:3, :3].T  #
         up_vector = np.array([0, 1, 0]) @ camera_tf[:3, :3].T  #
 
-        log.debug(f"cam vec, up vec:\n{camera_vector}, {up_vector}")
+        # log.debug(f"cam vec, up vec:\n{camera_vector}, {up_vector}")
 
         view_matrix = self.con.computeViewMatrix(camera_tf[:3, 3], camera_tf[:3, 3] + 0.1 * camera_vector, up_vector)
         return view_matrix

@@ -69,7 +69,7 @@ class PruningEnv(gym.Env):
         # tree_obj_path: str | None = None,
         verbose: bool = True,
         load_robot: bool = True,
-        # robot_type: str = "ur5e",
+        robot_type: str = "ur5",
         robot_pos: ArrayLike = np.array([0, 0, 0]),
         robot_orientation: ArrayLike = np.array([0, 0, 0, 1]),
         # use_ik: bool = True,
@@ -142,22 +142,27 @@ class PruningEnv(gym.Env):
 
         # UR5 Robot
         if load_robot:
-            self.ur5 = self.load_robot(robot_pos=robot_pos, robot_orientation=robot_orientation, randomize_pose=False)
+            self.ur5 = self.load_robot(type=robot_type, robot_pos=robot_pos, robot_orientation=robot_orientation, randomize_pose=False)
         return
 
-    def load_robot(self, robot_pos: ArrayLike, robot_orientation: ArrayLike, randomize_pose: bool = False):
-        log.info("Loading UR5 Robot")
-        robot = UR5(
-            con=self.pbutils.pbclient,
-            robot_urdf_path=ROBOT_URDF_PATH,
-            pos=robot_pos,
-            orientation=robot_orientation,
-            randomize_pose=randomize_pose,
-            verbose=self.verbose,
-        )
+    def load_robot(self, type: str, robot_pos: ArrayLike, robot_orientation: ArrayLike, randomize_pose: bool = False):
+        """Load a robot into the environment. Currently only UR5 is supported. TODO: Add Panda"""
+        type = type.strip().lower()
+        if type == "ur5":
+            log.info("Loading UR5 Robot")
+            robot = UR5(
+                con=self.pbutils.pbclient,
+                robot_urdf_path=ROBOT_URDF_PATH,
+                pos=robot_pos,
+                orientation=robot_orientation,
+                randomize_pose=randomize_pose,
+                verbose=self.verbose,
+            )
+        else:
+            raise NotImplementedError(f"Robot type {type} not implemented")
         return robot
 
-    def load_tree(
+    def load_tree( # TODO: Clean up Tree init vs create_tree, probably not needed. Too many file checks.
         self,
         pbutils: PyBUtils,
         scale: float,
@@ -262,7 +267,27 @@ class PruningEnv(gym.Env):
         self.collision_object_ids["SUPPORT"] = support_post
         return
 
-    def deproject_pixels_to_points(self, data: np.ndarray) -> np.ndarray:
+    def deactivate_support_posts(self) -> None:
+        # try:
+        #     self.pbutils.pbclient.removeBody(self.collision_object_ids["SUPPORT"])
+        #     log.info(f"Supports and post deactivated")
+        # except Exception as e:
+        #     log.error(f"Error deactivating supports and post: {e}")
+        return
+
+    def reset_environment(self) -> None:
+        # self.pbutils.pbclient.resetSimulation()
+        return
+
+
+    def activate_cylinder(position: ArrayLike | None = None, orientation: ArrayLike | None = None) -> None:
+        """Activate a generic cylinder object in the environment."""
+        
+        
+        return
+    
+    
+    def deproject_pixels_to_points(self, data: np.ndarray, view_matrix: np.ndarray) -> np.ndarray:
         """Compute world XYZ from image XY and measured depth.
         (pixel_coords -- [u,v]) -> (film_coords -- [x,y]) -> (camera_coords -- [X, Y, Z]) -> (world_coords -- [U, V, W])
 
@@ -275,17 +300,19 @@ class PruningEnv(gym.Env):
         TODO: change all `reshape` to `resize`
         """
 
-        # Get view and projection matrices
-        view_matrix = np.asarray(
-            self.ur5.get_view_mat_at_curr_pose(pan=self.cam_pan, tilt=self.cam_tilt, xyz_offset=self.cam_xyz_offset)
-        ).reshape([4, 4], order="F")
-        log.debug(f"View matrix:\n{view_matrix}")
+
+        # log.debug(f"View matrix:\n{view_matrix}")
 
         # Flip the y and z axes to convert from OpenGL camera frame to standard camera frame.
         # https://stackoverflow.com/questions/4124041/is-opengl-coordinate-system-left-handed-or-right-handed
         # https://github.com/bitlw/LearnProjMatrix/blob/main/doc/OpenGL_Projection.md#introduction
         view_matrix[1:3, :] = -view_matrix[1:3, :]
         proj_matrix = np.asarray(self.pbutils.proj_mat).reshape([4, 4], order="F")
+
+
+        # rgb, depth = self.pbutils.get_rgbd_at_cur_pose(type='robot', view_matrix=view_matrix)
+        # data = depth.reshape((self.cam_width * self.cam_height, 1), order="F")
+
 
         # Get camera intrinsics from projection matrix
         fx = proj_matrix[0, 0]
@@ -373,6 +400,80 @@ class PruningEnv(gym.Env):
         #     # self.reset_tree()
 
         return self.reachable_points
+
+    def get_key_pressed(self, relevant=None) -> list:
+        """Return the keys pressed by the user."""
+        pressed_keys = []
+        events = self.pbutils.pbclient.getKeyboardEvents()
+        key_codes = events.keys()
+        for key in key_codes:
+            pressed_keys.append(key)
+        return pressed_keys
+
+    def get_key_action(self, keys_pressed: list) -> np.ndarray:
+        """Return an action based on the keys pressed."""
+        action = np.array([0.,0.,0, 0., 0., 0.])
+        # keys_pressed = self.get_key_pressed()
+        if keys_pressed:
+            # TODO: Make these values all sum so that multi-dof actions can be performed
+            if ord('a') in keys_pressed:
+                # action = np.array([0.01, 0, 0, 0, 0, 0])
+                action[0] += 0.01
+            elif ord('d') in keys_pressed:
+                # action = np.array([-0.01, 0, 0, 0, 0, 0])
+                action[0] += -0.01
+            elif ord('s') in keys_pressed:
+                # action = np.array([0, 0.01, 0, 0, 0, 0])
+                action[1] += 0.01
+            elif ord('w') in keys_pressed:
+                # action = np.array([0, -0.01, 0, 0, 0, 0])
+                action[1] += -0.01
+            elif ord('q') in keys_pressed:
+                # action = np.array([0, 0, 0.01, 0, 0, 0])
+                action[2] += 0.01
+            elif ord('e') in keys_pressed:
+                # action = np.array([0, 0, -0.01, 0, 0, 0])
+                action[2] += -0.01
+            elif ord('z') in keys_pressed:
+                # action = np.array([0, 0, 0, 0.01, 0, 0])
+                action[3] += 0.01
+            elif ord('c') in keys_pressed:
+                # action = np.array([0, 0, 0, -0.01, 0, 0])
+                action[3] += -0.01
+            elif ord('x') in keys_pressed:
+                # action = np.array([0, 0, 0, 0, 0.01, 0])
+                action[4] += 0.01
+            elif ord('v') in keys_pressed:
+                # action = np.array([0, 0, 0, 0, -0.01, 0])
+                action[4] += -0.01
+            elif ord('r') in keys_pressed:
+                # action = np.array([0, 0, 0, 0, 0, 0.05])
+                action[5] += 0.05
+            elif ord('f') in keys_pressed:
+                # action = np.array([0, 0, 0, 0, 0, -0.05])
+                action[5] += -0.05
+            elif ord('p') in keys_pressed:
+                # Get view and projection matrices
+                view_matrix = np.asarray(self.ur5.get_view_mat_at_curr_pose(pan=0, tilt=0, xyz_offset=[0,0,0])).reshape([4, 4], order="F")
+                rgb, depth = self.pbutils.get_rgbd_at_cur_pose(type='robot', view_matrix=view_matrix)
+                log.debug(depth)
+                depth = depth.reshape((self.cam_width * self.cam_height, 1), order="F")
+                world_points = self.deproject_pixels_to_points(data=depth, view_matrix=view_matrix)
+                # log.debug(f"world_points: {world_points}")
+            elif ord('t') in keys_pressed:
+                # env.force_time_limit()
+                infos = {}
+                infos['TimeLimit.truncated'] = True
+                self.reset_environment() # TODO: Write
+                # set_goal_callback._update_tree_properties()
+                # env.is_goal_state = True
+            else:
+                action = np.array([0.,0.,0, 0., 0., 0.])
+                keys_pressed = []
+        else:
+            action = np.array([0.,0.,0, 0., 0., 0.])
+            keys_pressed = []
+        return action
 
     def debug_plots(self, data, cam_coords, world_coords, view_matrix):
         import plotly.graph_objects as go
@@ -463,7 +564,7 @@ class PruningEnv(gym.Env):
                     z=world_coords[:, 2],
                     name="tof_data",
                     mode="markers",
-                    marker=dict(size=10),
+                    marker=dict(size=2),
                     ids=np.array([f"{i}" for i in range(self.cam_width * self.cam_height)]),
                     hovertemplate=hovertemplate,
                 )
@@ -484,9 +585,9 @@ class PruningEnv(gym.Env):
             title="World Coordinates",
             scene=dict(
                 aspectmode="cube",
-                # xaxis=dict(range=[-1.0, 1.0]),
-                # yaxis=dict(range=[-0.1, 1.0]),
-                # zaxis=dict(range=[-0.0, 2.1]),
+                xaxis=dict(range=[-1.0, 1.0]),
+                yaxis=dict(range=[-0.1, 1.0]),
+                zaxis=dict(range=[-0.0, 2.1]),
                 camera=dict(
                     up=dict(x=0, y=0, z=1),
                     center=dict(x=0, y=0, z=0),
@@ -500,51 +601,23 @@ class PruningEnv(gym.Env):
         # log.warn(f"inv_view_matrix: {inv_view_matrix}")
         return
 
+    def run_sim(self) -> int:
+
+        return 0
 
 def main():
-    import time
-    from pybullet_tree_sim.tree import Tree
-    import secrets
-
-    cam_dfov = 65
-    cam_height = 8
-    cam_width = 8
-
-    pbutils = PyBUtils(renders=True, cam_width=cam_width, cam_height=cam_height, dfov=cam_dfov)
-    penv = PruningEnv(
-        pbutils=pbutils, load_robot=True, robot_pos=[0, 1, 0], verbose=True, cam_width=cam_width, cam_height=cam_height
-    )
-    penv.load_tree(
-        pbutils=pbutils,
-        scale=1.0,
-        tree_id=1,
-        tree_type="envy",
-        tree_namespace="LPy_",
-        # tree_urdf_path=os.path.join(URDF_PATH, "trees", "envy", "generated", "LPy_envy_tree0.urdf"),
-        save_tree_urdf=False,
-        # randomize_pose=True
-    )
-    penv.activate_tree(tree_id_str="LPy_envy_tree1")
-
-    data = np.zeros((cam_width, cam_height), dtype=float)
-    generator = np.random.default_rng(seed=secrets.randbits(128))
+    # data = np.zeros((cam_width, cam_height), dtype=float)
+    # generator = np.random.default_rng(seed=secrets.randbits(128))
     # data[0,0] = 0.31
     # data[:, 3:5] = tuple(generator.uniform(0.31, 0.35, (cam_height, 2)))
 
-    start = 0.31
-    stop = 0.35
-    data[:, 3:5] = np.array([np.arange(start, stop, (stop - start) / 8), np.arange(start, stop, (stop - start) / 8)]).T
-    data[-1, 3] = 0.31
-    data = data.reshape((cam_width * cam_height, 1), order="F")
+    # start = 0.31
+    # stop = 0.35
+    # data[:, 3:5] = np.array([np.arange(start, stop, (stop - start) / 8), np.arange(start, stop, (stop - start) / 8)]).T
+    # data[-1, 3] = 0.31
+    # data = data.reshape((cam_width * cam_height, 1), order="F")
 
     # log.warning(f"joint angles: {penv.ur5.get_joint_angles()}")
-    log.debug(f'joints: {penv.ur5.joints}')
-    point_cloud = penv.deproject_pixels_to_points(data=data)
-
-    # time.sleep(30)
-    penv.deactivate_tree(tree_id_str="LPy_envy_tree1")
-    # time.sleep(3)
-
     return
 
 
