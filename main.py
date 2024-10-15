@@ -1,23 +1,59 @@
 #!/usr/bin/env python3
 
-from pybullet_tree_sim.pyb_environment import PyBEnvironment
+from pybullet_tree_sim.pruning_environment import PruningEnv
 from pybullet_tree_sim.tree import Tree
-from pybullet_tree_sim.utils import pybullet_utils, ur5_utils
+from pybullet_tree_sim.utils.pyb_utils import PyBUtils
+from pybullet_tree_sim.utils.helpers import get_fov_from_dfov
+
+import numpy as np
+import secrets
+import time
+from zenlog import log
 
 
 def main():
-    # env: The environment object
-    # pyb: The pybullet object
-    # urdf_path: The path to the urdf file
-    # obj_path: The path to the obj file
-    # labelled_obj_path: The path to the labelled obj file
+    # TODO: CLI args?
+    cam_dfov = 65
+    cam_height = 8
+    cam_width = 8
 
-    env = PyBEnvironment()
+    pbutils = PyBUtils(renders=True, cam_width=cam_width, cam_height=cam_height, dfov=cam_dfov)
+    penv = PruningEnv(
+        pbutils=pbutils, load_robot=True, robot_pos=[0, 1, 0], verbose=True, cam_width=cam_width, cam_height=cam_height
+    )
+    penv.load_tree(
+        pbutils=pbutils,
+        scale=1.0,
+        tree_id=1,
+        tree_type="envy",
+        tree_namespace="LPy_",
+        # tree_urdf_path=os.path.join(URDF_PATH, "trees", "envy", "generated", "LPy_envy_tree0.urdf"),
+        save_tree_urdf=False,
+        # randomize_pose=True
+    )
+    penv.activate_tree(tree_id_str="LPy_envy_tree1")
 
-    # From Tree originally
-    # self.base_xyz = env.ur5.get_current_pose(env.ur5.base_index)[0]
-    # self.ee_xyz = env.ur5.get_current_pose(env.ur5.end_effector_index)[0]
+    # Run the sim a little just to get the environment properly loaded.
+    for i in range(100):
+        pbutils.pbclient.stepSimulation()
+        time.sleep(0.1)
 
+    # Simulation loop
+    while True:
+        try:
+            keys_pressed = penv.get_key_pressed()
+            action = penv.get_key_action(keys_pressed=keys_pressed)
+            action = action.reshape((6,1))
+            jv, jacobian = penv.ur5.calculate_joint_velocities_from_ee_velocity(end_effector_velocity=action)
+            penv.ur5.action = jv
+            singularity = penv.ur5.set_joint_velocities(penv.ur5.action)
+            penv.pbutils.pbclient.stepSimulation()
+            time.sleep(0.01)
+        except KeyboardInterrupt:
+            break
+
+    penv.deactivate_tree(tree_id_str="LPy_envy_tree1")
+    penv.pbutils.pbclient.disconnect()
     return
 
 
