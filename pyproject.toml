@@ -27,6 +27,7 @@ dependencies = [
     "plotly",
     "pybullet==3.2.6",
     "pywavefront",
+    "pyyaml",
     "scikit-image",
     "xacro",
     "zenlog",
