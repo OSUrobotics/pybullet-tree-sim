@@ -19,6 +19,7 @@ import numpy as np
 import os
 import skimage.draw as skdraw
 import sys
+import time
 from typing import Optional, Tuple
 import xml
 
@@ -139,6 +140,8 @@ class PruningEnv(gym.Env):
         # self.tree_scale: float = 1.0
 
         self.trees = {}
+        self.debouce_time = 0.5
+        self.last_button_push_time = time.time()
 
         # UR5 Robot
         if load_robot:
@@ -276,17 +279,18 @@ class PruningEnv(gym.Env):
         return
 
     def reset_environment(self) -> None:
+        """TODO"""
         # self.pbutils.pbclient.resetSimulation()
         return
 
 
     def activate_cylinder(position: ArrayLike | None = None, orientation: ArrayLike | None = None) -> None:
         """Activate a generic cylinder object in the environment."""
-        
-        
+
+
         return
-    
-    
+
+
     def deproject_pixels_to_points(self, data: np.ndarray, view_matrix: np.ndarray) -> np.ndarray:
         """Compute world XYZ from image XY and measured depth.
         (pixel_coords -- [u,v]) -> (film_coords -- [x,y]) -> (camera_coords -- [X, Y, Z]) -> (world_coords -- [U, V, W])
@@ -403,12 +407,12 @@ class PruningEnv(gym.Env):
 
     def get_key_pressed(self, relevant=None) -> list:
         """Return the keys pressed by the user."""
-        pressed_keys = []
+        keys_pressed = []
         events = self.pbutils.pbclient.getKeyboardEvents()
         key_codes = events.keys()
         for key in key_codes:
-            pressed_keys.append(key)
-        return pressed_keys
+            keys_pressed.append(key)
+        return keys_pressed
 
     def get_key_action(self, keys_pressed: list) -> np.ndarray:
         """Return an action based on the keys pressed."""
@@ -419,57 +423,63 @@ class PruningEnv(gym.Env):
             if ord('a') in keys_pressed:
                 # action = np.array([0.01, 0, 0, 0, 0, 0])
                 action[0] += 0.01
-            elif ord('d') in keys_pressed:
+            if ord('d') in keys_pressed:
                 # action = np.array([-0.01, 0, 0, 0, 0, 0])
                 action[0] += -0.01
-            elif ord('s') in keys_pressed:
+            if ord('s') in keys_pressed:
                 # action = np.array([0, 0.01, 0, 0, 0, 0])
                 action[1] += 0.01
-            elif ord('w') in keys_pressed:
+            if ord('w') in keys_pressed:
                 # action = np.array([0, -0.01, 0, 0, 0, 0])
                 action[1] += -0.01
-            elif ord('q') in keys_pressed:
+            if ord('q') in keys_pressed:
                 # action = np.array([0, 0, 0.01, 0, 0, 0])
                 action[2] += 0.01
-            elif ord('e') in keys_pressed:
+            if ord('e') in keys_pressed:
                 # action = np.array([0, 0, -0.01, 0, 0, 0])
                 action[2] += -0.01
-            elif ord('z') in keys_pressed:
+            if ord('z') in keys_pressed:
                 # action = np.array([0, 0, 0, 0.01, 0, 0])
                 action[3] += 0.01
-            elif ord('c') in keys_pressed:
+            if ord('c') in keys_pressed:
                 # action = np.array([0, 0, 0, -0.01, 0, 0])
                 action[3] += -0.01
-            elif ord('x') in keys_pressed:
+            if ord('x') in keys_pressed:
                 # action = np.array([0, 0, 0, 0, 0.01, 0])
                 action[4] += 0.01
-            elif ord('v') in keys_pressed:
+            if ord('v') in keys_pressed:
                 # action = np.array([0, 0, 0, 0, -0.01, 0])
                 action[4] += -0.01
-            elif ord('r') in keys_pressed:
+            if ord('r') in keys_pressed:
                 # action = np.array([0, 0, 0, 0, 0, 0.05])
                 action[5] += 0.05
-            elif ord('f') in keys_pressed:
+            if ord('f') in keys_pressed:
                 # action = np.array([0, 0, 0, 0, 0, -0.05])
                 action[5] += -0.05
-            elif ord('p') in keys_pressed:
-                # Get view and projection matrices
-                view_matrix = np.asarray(self.ur5.get_view_mat_at_curr_pose(pan=0, tilt=0, xyz_offset=[0,0,0])).reshape([4, 4], order="F")
-                rgb, depth = self.pbutils.get_rgbd_at_cur_pose(type='robot', view_matrix=view_matrix)
-                log.debug(depth)
-                depth = depth.reshape((self.cam_width * self.cam_height, 1), order="F")
-                world_points = self.deproject_pixels_to_points(data=depth, view_matrix=view_matrix)
-                # log.debug(f"world_points: {world_points}")
-            elif ord('t') in keys_pressed:
+            if ord('p') in keys_pressed:
+
+                if time.time() - self.last_button_push_time > self.debouce_time:
+
+                    # Get view and projection matrices
+                    # view_matrix = np.asarray(self.ur5.get_view_mat_at_curr_pose(pan=0, tilt=0, xyz_offset=[0,0,0])).reshape([4, 4], order="F")
+                    view_matrix = self.ur5.get_view_mat_at_curr_pose(pan=0, tilt=0, xyz_offset=[0,0,0])
+                    log.warning(f"button p pressed")
+                    rgb, depth = self.pbutils.get_rgbd_at_cur_pose(type='robot', view_matrix=view_matrix)
+                    # log.debug(f'depth:\n{depth}')
+                    depth = -1 * depth.reshape((self.cam_width * self.cam_height, 1), order="F")
+                    world_points = self.deproject_pixels_to_points(data=depth, view_matrix=np.asarray(view_matrix).reshape([4, 4], order="F"))
+                    # log.debug(f"world_points: {world_points}")
+                    self.last_button_push_time = time.time()
+                else:
+                    log.warning("debouce time not yet reached")
+            if ord('t') in keys_pressed:
                 # env.force_time_limit()
                 infos = {}
                 infos['TimeLimit.truncated'] = True
                 self.reset_environment() # TODO: Write
                 # set_goal_callback._update_tree_properties()
                 # env.is_goal_state = True
-            else:
-                action = np.array([0.,0.,0, 0., 0., 0.])
-                keys_pressed = []
+
         else:
             action = np.array([0.,0.,0, 0., 0., 0.])
             keys_pressed = []
@@ -586,7 +596,7 @@ class PruningEnv(gym.Env):
             scene=dict(
                 aspectmode="cube",
                 xaxis=dict(range=[-1.0, 1.0]),
-                yaxis=dict(range=[-0.1, 1.0]),
+                yaxis=dict(range=[-1.0, 1.0]),
                 zaxis=dict(range=[-0.0, 2.1]),
                 camera=dict(
                     up=dict(x=0, y=0, z=1),

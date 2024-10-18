@@ -534,7 +534,7 @@ class Tree:
         orientation: ArrayLike = [0, 0, 0, 1],
         randomize_pose: bool = False,
     ) -> Tree:
-        """Create a tree using some input data"""
+        """TODO: Delete this function, just create tree object"""
 
         tree = Tree(
             pbutils=pbutils,
