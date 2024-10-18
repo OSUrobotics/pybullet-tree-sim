@@ -181,7 +181,11 @@ class PyBUtils:
     @staticmethod
     def linearize_depth(depth: NDArray, far_val: float, near_val: float):
         """OpenGL returns contracted depth, linearize it"""
-        depth_linearized = near_val / (far_val - (far_val - near_val) * depth + 0.00000001)
+        try:
+            depth_linearized = near_val / (far_val - (far_val - near_val) * depth)
+        except ZeroDivisionError:
+            log.warning("Encountered division by 0 in depth linearization.")
+            depth_linearized = None
         return depth_linearized
 
     def get_rgbd_at_cur_pose(self, type, view_matrix) -> Tuple[NDArray, NDArray]:
