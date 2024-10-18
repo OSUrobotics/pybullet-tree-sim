@@ -151,7 +151,7 @@ class UR5:
         # log.warning(f"base_pos: {base_pos}, base_or: {base_or}")
         # log.warning(f"eef_pos: {eef_pos}, eef_or: {eef_or}")
         #
-        log.debug(self.joint_info)
+        # log.debug(self.joint_info)
         return
 
     def reset_ur5_arm(self) -> None:
