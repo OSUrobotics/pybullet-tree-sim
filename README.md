@@ -3,7 +3,8 @@
 1. Separate camera class
     1. ToF class inherits camera classs
 1. Dynamically populate UR URDF. Allow for various end-effectors and robot configurations.
-    1. Make sure to include camera and other sensors.
+    1. Make sure to include camera and other sensors. (Source manifold mesh -- utils -> camera class (C++))
+    1. Dynamic parent joint for Panda to slider/farm-ng (like UR5)
 1. Add generic robot class (from Abhinav's code)
     1. Panda/UR5
     1. End-effector

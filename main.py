@@ -37,10 +37,23 @@ def main():
     for i in range(100):
         pbutils.pbclient.stepSimulation()
         time.sleep(0.1)
+        
+    # rng = np.random.default_rng(seed=secrets.randbits(128))
+    # fake_data = np.zeros((cam_width, cam_height), dtype=float)
+    # fake_data[:, 3:5] = rng.uniform(low=0.31, high=0.38, size=(8,2))
+    
+    # view_matrix = penv.ur5.get_view_mat_at_curr_pose(0,0,[0,0,0])
+    # fake_data = fake_data.reshape((cam_width * cam_height, 1), order="F")
+    # penv.deproject_pixels_to_points(data=fake_data, view_matrix=np.asarray(view_matrix).reshape((4,4), order="F"))
+    # print(fake_data)
+    # import sys
+    # sys.exit()
 
     # Simulation loop
     while True:
         try:
+            view_matrix = penv.ur5.get_view_mat_at_curr_pose(0,0,[0,0,0])
+            rgbd = penv.pbutils.get_rgbd_at_cur_pose(type='robot', view_matrix=view_matrix)
             keys_pressed = penv.get_key_pressed()
             action = penv.get_key_action(keys_pressed=keys_pressed)
             action = action.reshape((6,1))
@@ -59,3 +72,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+  

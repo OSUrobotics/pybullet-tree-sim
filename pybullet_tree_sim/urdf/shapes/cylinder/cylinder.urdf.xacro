@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<robot name="cylinder" xmlns:xacro="http://ros.org/wiki/xacro">
+
+    <xacro:include filename="./macro/cylinder_base.urdf.xacro" />
+
+    <xacro:arg name="namespace" default="" />
+    <xacro:arg name="radius" default="0.1" />
+    <xacro:arg name="height" default="envy" />
+    <xacro:arg name="mass" default="1.0" />
+    <xacro:arg name="parent" default="world" />
+    <xacro:arg name="xyz" default="0.0 0.0 0.0"/>
+    <xacro:arg name="rpy" default="0.0 0.0 0.0"/>
+
+    <xacro:cylinder
+        namespace="$(arg namespace)"
+        radius="$(arg radius)"
+        height="$(arg height)"
+        mass="$(arg mass)"
+        parent="$(arg parent)" >
+        <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"/>
+    </xacro:cylinder>
+
+</robot>
