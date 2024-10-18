@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<robot name="cylinder" xmlns:xacro="http://ros.org/wiki/xacro">
+
+    <xacro:macro name="cylinder" params="namespace radius height mass parent *origin">
+        <xacro:include filename="./macro/cylinder_macro.urdf.xacro"/> <!-- TODO: get absolute file paths? -->
+
+        <xacro:cylinder_macro
+            namespace="${namespace}"
+            radius="${radius}"
+            height="${height}"
+            mass="${mass}"
+            parent="${parent}" >
+            <xacro:insert_block name="origin"/>
+        </xacro:cylinder_macro>
+    </xacro:macro>
+
+</robot>
