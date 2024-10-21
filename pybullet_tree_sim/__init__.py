@@ -1,6 +1,6 @@
 import os
 
-# Global URDF path pointing to robot and supports URDF
+# Global URDF path pointing to robot and supports URDFs
 PKL_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "pkl"))
 MESHES_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "meshes"))
 URDF_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "urdf"))
