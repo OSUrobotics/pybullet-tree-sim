@@ -1,9 +1,4 @@
 #!/usr/bin/env python3
-from xml.sax.xmlreader import XMLReader
-from numpy.typing import NDArray
-from plotly.graph_objs import Violin
-from scipy.spatial.transform import Rotation
-from std_msgs.msg import String
 from pybullet_tree_sim import MESHES_PATH, URDF_PATH, RGB_LABEL, ROBOT_URDF_PATH
 from pybullet_tree_sim.tree import Tree, TreeException
 from pybullet_tree_sim.utils.ur5_utils import UR5
@@ -21,7 +16,9 @@ import skimage.draw as skdraw
 import sys
 import time
 from typing import Optional, Tuple
-import xml
+
+from numpy.typing import NDArray
+from scipy.spatial.transform import Rotation
 
 import modern_robotics as mr
 from numpy.typing import ArrayLike
