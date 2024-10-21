@@ -296,6 +296,21 @@ class UR5:
         inv_jacobian = np.linalg.pinv(jacobian)
         joint_velocities = np.matmul(inv_jacobian, end_effector_velocity).astype(np.float32)
         return joint_velocities, jacobian
+        
+    def calculate_joint_velocities_from_ee_velocity_dls(
+        self,
+        end_effector_velocity: NDArray[Shape['6, 1'], Float],
+        damping_factor: float = 0.05
+    ) -> Tuple[ndarray, ndarray]:
+        """Calculate joint velocities from end effector velocity using damped least squares"""
+        jacobian = self.calculate_jacobian()
+        identity_matrix = np.eye(jacobian.shape[0])
+        damped_matrix = jacobian @ jacobian.T + (damping_factor ** 2) * identity_matrix
+        damped_matrix_inv = np.linalg.inv(damped_matrix)
+        dls_inv_jacobian = jacobian.T @ damped_matrix_inv
+        joint_velocities = dls_inv_jacobian @ end_effector_velocity
+        return joint_velocities, jacobian
+
 
     def get_joint_angles(self) -> Tuple[float, float, float, float, float, float]:
         """Return joint angles"""

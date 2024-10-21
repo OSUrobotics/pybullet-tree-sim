@@ -194,7 +194,7 @@ class PyBUtils:
         rgbd = self.get_image_at_curr_pose(type, view_matrix)
         rgb, depth = self.seperate_rgbd_rgb_d(rgbd, height=self.cam_height, width=self.cam_width)
         depth = depth.astype(np.float32)
-        depth = self.linearize_depth(depth, self.far_val, self.near_val) - 0.5
+        depth = self.linearize_depth(depth, self.far_val, self.near_val)
         return rgb, depth
 
     def visualize_points(self, points: List, type: str) -> None:

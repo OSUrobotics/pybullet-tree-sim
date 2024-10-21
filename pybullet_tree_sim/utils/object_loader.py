@@ -8,7 +8,6 @@ class ObjectLoader():
     
     def __init__(self) -> None:
         
-        
         return
         
     def activate_object(self, object_urdf_path: str) -> bool:
