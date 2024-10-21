@@ -307,7 +307,7 @@ class PruningEnv(gym.Env):
         # Flip the y and z axes to convert from OpenGL camera frame to standard camera frame.
         # https://stackoverflow.com/questions/4124041/is-opengl-coordinate-system-left-handed-or-right-handed
         # https://github.com/bitlw/LearnProjMatrix/blob/main/doc/OpenGL_Projection.md#introduction
-        view_matrix[1:3, :] = -view_matrix[1:3, :]
+        # view_matrix[1:3, :] = -view_matrix[1:3, :]
         proj_matrix = np.asarray(self.pbutils.proj_mat).reshape([4, 4], order="F")
 
 
@@ -324,6 +324,7 @@ class PruningEnv(gym.Env):
         cam_coords = np.concatenate((cam_coords, data, np.ones((self.cam_width * self.cam_height, 1))), axis=1)
 
         world_coords = (mr.TransInv(view_matrix) @ cam_coords.T).T
+
 
         plot = True
         if plot:
@@ -546,7 +547,7 @@ class PruningEnv(gym.Env):
                     y=cam_coords[:, 1],
                     z=cam_coords[:, 2],
                     mode="markers",
-                    ids=[f"{i}" for i in range(self.cam_width * self.cam_height)],
+                    ids=[f"{i}" for i in range(self.cam_width * self.cam_height)], # TODO: change these to be counted as in image space
                     hovertemplate=hovertemplate,
                 )
             ]
