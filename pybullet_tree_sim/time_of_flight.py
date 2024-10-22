@@ -11,6 +11,7 @@ from zenlog import log
 
 class TimeOfFlight(Camera):
     def __init__(self, sensor_name: str, sensor_type: str = "tof") -> None:
+        """Builds a ToF camera object from a base Camera class"""
         super().__init__(sensor_name=sensor_name, sensor_type=sensor_type)
         return
 
