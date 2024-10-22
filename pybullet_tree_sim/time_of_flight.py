@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Base class for a ToF Camera. Inherits functionality from base Camera class"""
 
-from pybullet_tree_sim import TOFS_PATH
 from pybullet_tree_sim.camera import Camera
 import pybullet_tree_sim.utils.yaml_utils as yutils
 
@@ -14,8 +13,6 @@ class TimeOfFlight(Camera):
         """Builds a ToF camera object from a base Camera class"""
         super().__init__(sensor_name=sensor_name, sensor_type=sensor_type)
         return
-
-
 
 
 def main():
