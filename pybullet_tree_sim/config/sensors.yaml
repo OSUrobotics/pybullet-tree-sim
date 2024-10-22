@@ -1,4 +1,4 @@
-# This file defines the cameras in the system
+# This file defines the sensors that are connected to the robot.
 cameras:
     rgbd: 
         type: realsense_d435i
