@@ -1,0 +1,6 @@
+vl6180:
+    dfov: 25.0
+    near_plane: 0.002
+    far_plane: 3.4
+    rows: 1
+    columns: 1

@@ -1,0 +1,6 @@
+vl53l8cx:
+    dfov: 65.0
+    near_plane: 0.03
+    far_plane: 3.4
+    rows: 8
+    columns: 8

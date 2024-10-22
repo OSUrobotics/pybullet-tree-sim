@@ -1,4 +1,5 @@
 ## TODO
+1. For Claire: Generic URDF to Generic Robot class
 1. Add basic cylinder to world. Dynamically create URDF.
 1. Separate camera class
     1. ToF class inherits camera classs
