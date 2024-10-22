@@ -1,0 +1,4 @@
+realsense_d435i:
+    name: "RealSense D435i"
+    data_type: "rgbd"
+    
