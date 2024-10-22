@@ -15,7 +15,7 @@ def construct_angle_degrees(loader, node):
     """Utility function for converting degrees into radians from yaml."""
     return np.radians(construct_angle_radians(loader, node))
 
-def load_yaml(file_path):
+def load_yaml(file_path) -> dict | None:
     try:
         yaml.SafeLoader.add_constructor("!radians", construct_angle_radians)
         yaml.SafeLoader.add_constructor("!degrees", construct_angle_degrees)

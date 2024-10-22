@@ -1,4 +1,6 @@
 vl53l8cx:
+    name: "VL53L8CX"
+    data_type: "d"
     dfov: 65.0
     near_plane: 0.03
     far_plane: 3.4

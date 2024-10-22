@@ -3,33 +3,25 @@
 Resources:
 """
 
-from pybullet_tree_sim import CONFIG_PATH
-import pybullet_tree_sim.utils.yaml_utils as yutils
-
+from pybullet_tree_sim import CAMERAS_PATH
+from pybullet_tree_sim.sensor import Sensor
 import os
 
-class Camera:
-    def __init__(self, type: str) -> None:
-        """
-        Initialize the camera object.
+from zenlog import log
 
-        @param type: The type of camera to be used.
-        """
-        type = type.strip().lower()
-        self.intinsics = self._load_camera_intrinsics(type=type)
+class Camera(Sensor):
+    def __init__(self, name: str, sensor_type: str='camera') -> None:
+        """Builds a camera object from a base Sensor class"""
+
         return
-        
-    def _load_camera_intrinsics(self, type: str) -> None:
-        camera_config_file = os.path.join(CONFIG_PATH, f"{type}.yaml")
-        camera_config_content = yutils.load_yaml(camera_config_file)
-        return
+
 
 
 def main():
-
+    camera = Camera(type="realsense_d435i")
+    print(camera.params)
     return
 
 
 if __name__ == "__main__":
-    camera = Camera(type="vl53l8cx")
     main()
