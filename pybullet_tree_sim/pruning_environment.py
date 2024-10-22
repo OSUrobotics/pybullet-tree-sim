@@ -47,6 +47,8 @@ class PruningEnv(gym.Env):
 
     _supports_and_post_xacro_path = os.path.join(URDF_PATH, "supports_and_post", "supports_and_post.urdf.xacro")
     _supports_and_post_urdf_path = os.path.join(URDF_PATH, "supports_and_post", "supports_and_post.urdf")
+    _shapes_xacro_dir= os.path.join(URDF_PATH, "shapes", "")
+
 
     def __init__(
         self,
@@ -101,7 +103,7 @@ class PruningEnv(gym.Env):
         self.tree_count = tree_count
         self.is_goal_state = False
 
-        # Camera params
+        # Camera params # TODO: Move to Camera class
         self.cam_width = cam_width
         self.cam_height = cam_height
         self.cam_pan = 0
@@ -208,6 +210,12 @@ class PruningEnv(gym.Env):
     def activate_tree(
         self, tree: Tree | None = None, tree_id_str: str | None = None, include_support_posts: bool = True
     ) -> None:
+        """Activate a tree by object or by tree_id_str. Can include support posts. Must provide either a Tree or tree_id_str.
+        @param tree (Tree/None): Tree object to be activated into the pruning environment.
+        @param tree_id_str (str/None): String including the identification characteristics of the tree.
+        @return None
+        """
+
         if tree is None and tree_id_str is None:
             raise TreeException("Parameters 'tree' and 'tree_id_str' cannot both be None")
 
@@ -228,6 +236,7 @@ class PruningEnv(gym.Env):
         return
 
     def deactivate_tree(self, tree: Tree | None = None, tree_id_str: str | None = None) -> None:
+        """Deactivate a tree by object or by tree_id_str"""
         if tree is None and tree_id_str is None:
             raise TreeException("Parameters 'tree' and 'tree_id_str' cannot both be None")
 
@@ -254,17 +263,17 @@ class PruningEnv(gym.Env):
         if orientation is None:
             orientation = Rotation.from_euler("xyz", [np.pi / 2, 0, np.pi / 2]).as_quat()
 
-        if not os.path.exists(self._supports_and_post_urdf_path):
+        if not os.path.exists(self._supports_and_post_urdf_path): # TODO: change this -- it'll take a improperly positioned file and keep using it.'
             urdf_content = xutils.load_urdf_from_xacro(
                 xacro_path=self._supports_and_post_xacro_path, mappings=None
             ).toprettyxml()  # TODO: add mappings
             xutils.save_urdf(urdf_content=urdf_content, urdf_path=self._supports_and_post_urdf_path)
 
-        support_post = self.pbutils.pbclient.loadURDF(
+        support_post_id = self.pbutils.pbclient.loadURDF(
             fileName=self._supports_and_post_urdf_path, basePosition=position, baseOrientation=orientation
         )
-        log.info(f"Supports and post activated with PyBID {support_post}")
-        self.collision_object_ids["SUPPORT"] = support_post
+        log.info(f"Supports and post activated with PyBID {support_post_id}")
+        self.collision_object_ids["SUPPORT"] = support_post_id
         return
 
     def deactivate_support_posts(self) -> None:
@@ -280,10 +289,38 @@ class PruningEnv(gym.Env):
         # self.pbutils.pbclient.resetSimulation()
         return
 
+    def activate_shape(self, shape: str, position: ArrayLike | None = None, orientation: ArrayLike | None = None, **kwargs) -> None:
+        """Activate a generic cylinder object in the environment.
+        @param shape (str): shape type. Currently supported options are: [cylinder]
+        @param position (ArrayLike): Vector containing the xyz position of the base. Cylinder default position is the center of the cylinder.
+        @param orientation (ArrayLike): Vector containing the roll-pitch-yaw of the base about the world origin.
+        @param radius (float, Optional): if
+        @return None
+        """
+        shape = shape.strip().lower()
+        shape_xacro_path = os.path.join(self._shapes_xacro_dir, shape, f"{shape}.urdf.xacro")
+        shape_urdf_path = os.path.join(self._shapes_xacro_dir, shape, f"{shape}.urdf")
 
-    def activate_cylinder(position: ArrayLike | None = None, orientation: ArrayLike | None = None) -> None:
-        """Activate a generic cylinder object in the environment."""
+        if position is None:
+            position = [0,0,0]
+        if orientation is None:
+            orientation = [0,0,0,1]
+        else:
+            orientation = Rotation.from_euler('xyz', orientation).as_quat()
 
+        # if shape == "cylinder":
+        #     radius = kwargs.get('radius')
+        #     height = kwargs.get('height')
+
+        shape_mappings = kwargs
+        
+        urdf_content = xutils.load_urdf_from_xacro(xacro_path=shape_xacro_path, mappings=shape_mappings).toprettyxml()
+        xutils.save_urdf(urdf_content=urdf_content, urdf_path=shape_urdf_path)
+
+        shape_id = self.pbutils.pbclient.loadURDF(
+            fileName=shape_urdf_path, basePosition=position, baseOrientation=orientation
+        )
+        log.info(f"{shape.title()} loaded with PyBID {shape_id}")
 
         return
 
@@ -296,9 +333,10 @@ class PruningEnv(gym.Env):
         https://gachiemchiep.github.io/cheatsheet/camera_calibration/
         https://stackoverflow.com/questions/4124041/is-opengl-coordinate-system-left-handed-or-right-handed
 
-        @param data: 2D array of depth values
-
-        TODO: change all `reshape` to `resize`
+        @param data: nx1 array of depth values, Fortran order (column-first)
+        @param view_matrix: 4x4 matrix (world -> camera transform)
+        
+        @return: nx4 array of world XYZ coordinates
         """
 
 
@@ -498,8 +536,8 @@ class PruningEnv(gym.Env):
                     z=_data.flatten(order="C"),
                     mode="markers",
                     ids=np.array([f"{i}" for i in range(self.cam_width * self.cam_height)])
-                    .reshape((8, 8), order="C")
-                    .flatten(order="F"),
+                        .reshape((8, 8), order="C")
+                        .flatten(order="F"),
                     hovertemplate=hovertemplate,
                 )
             ]

@@ -3,11 +3,15 @@
 Resources: 
 """
 
+import yaml
+
 class Camera:
     def __init__(self) -> None:
         return
         
+    def load_camera_config(self) -> None:
         
+        return
         
 def main():
     

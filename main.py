@@ -3,7 +3,7 @@
 from pybullet_tree_sim.pruning_environment import PruningEnv
 from pybullet_tree_sim.tree import Tree
 from pybullet_tree_sim.utils.pyb_utils import PyBUtils
-from pybullet_tree_sim.utils.helpers import get_fov_from_dfov
+from pybullet_tree_sim.utils.camera_helpers import get_fov_from_dfov
 
 import numpy as np
 import secrets
