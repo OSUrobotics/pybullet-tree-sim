@@ -13,10 +13,7 @@ class Camera(Sensor):
     def __init__(self, sensor_name: str, sensor_type: str='camera') -> None:
         """Builds a camera object from a base Sensor class"""
         super().__init__(sensor_name=sensor_name, sensor_type=sensor_type)
-        return
-        
-    # TODO: Put camera-sepecific functions here. See Cindy's class
-    
+        return   
 
 
 def main():

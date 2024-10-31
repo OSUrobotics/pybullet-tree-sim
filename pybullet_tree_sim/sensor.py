@@ -13,6 +13,7 @@ class Sensor:
     
         @param name: The model name of sensor to be used.
         @param sensor_type: The type of sensor to be used. Current options are: ['camera', 'tof']
+        @return: None
         """
         sensor_type = sensor_type.strip().lower()
         self.sensor_path = os.path.join(CONFIG_PATH, sensor_type)
@@ -22,6 +23,8 @@ class Sensor:
     def _load_params(self, sensor_name: str, sensor_type) -> dict:
         """
         @param name: The model name of sensor to be used.
+        @param sensor_type: The type of sensor to be used. Current options are: ['camera', 'tof']
+        @return: A dictionary containing the sensor parameters.
         """
         sensor_config_path = os.path.join(self.sensor_path, f"{sensor_name}.yaml")
     

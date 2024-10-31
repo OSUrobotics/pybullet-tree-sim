@@ -12,7 +12,7 @@ from pybullet_utils import bullet_client as bc
 from scipy.constants import g as grav
 
 from pybullet_tree_sim import MESHES_PATH, URDF_PATH, TEXTURES_PATH
-from pybullet_tree_sim.utils.helpers import get_fov_from_dfov
+from pybullet_tree_sim.utils.camera_helpers import get_fov_from_dfov
 
 from zenlog import log
 
