@@ -20,7 +20,7 @@ import pywavefront
 from nptyping import NDArray, Shape, Float
 from pybullet_tree_sim import RGB_LABEL, URDF_PATH, MESHES_PATH, PKL_PATH
 from pybullet_tree_sim.utils.pyb_utils import PyBUtils
-from pybullet_tree_sim.utils.helpers import compute_perpendicular_projection_vector
+from pybullet_tree_sim.utils.camera_helpers import compute_perpendicular_projection_vector
 import pybullet_tree_sim.utils.xacro_utils as xutils
 from scipy.spatial.transform import Rotation
 import xacro

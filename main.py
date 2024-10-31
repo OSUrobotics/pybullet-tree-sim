@@ -21,28 +21,25 @@ def main():
     penv = PruningEnv(
         pbutils=pbutils, load_robot=True, robot_pos=[0, 1, 0], verbose=True, cam_width=cam_width, cam_height=cam_height
     )
-
-    penv.load_tree(
-        pbutils=pbutils,
-        scale=1.0,
-        tree_id=1,
-        tree_type="envy",
-        tree_namespace="LPy_",
-        # tree_urdf_path=os.path.join(URDF_PATH, "trees", "envy", "generated", "LPy_envy_tree0.urdf"),
-        save_tree_urdf=False,
-        # randomize_pose=True
-    )
-    penv.activate_tree(tree_id_str="LPy_envy_tree1")
+    
+    penv.activate_shape(shape="cylinder", radius=2*0.0254, height=2.0, orientation=[0,np.pi/2,0])
+    # penv.load_tree(
+    #     pbutils=pbutils,
+    #     scale=1.0,
+    #     tree_id=1,
+    #     tree_type="envy",
+    #     tree_namespace="LPy_",
+    #     # tree_urdf_path=os.path.join(URDF_PATH, "trees", "envy", "generated", "LPy_envy_tree0.urdf"),
+    #     save_tree_urdf=False,
+    #     # randomize_pose=True
+    # )
+    # penv.activate_tree(tree_id_str="LPy_envy_tree1")
 
     # Run the sim a little just to get the environment properly loaded.
     for i in range(100):
         pbutils.pbclient.stepSimulation()
         time.sleep(0.1)
         
-        
-        
-    penv.ur5.disable_self_collision()
-
     # Simulation loop
     while True:
         try:
@@ -59,7 +56,7 @@ def main():
         except KeyboardInterrupt:
             break
 
-    penv.deactivate_tree(tree_id_str="LPy_envy_tree1")
+    # penv.deactivate_tree(tree_id_str="LPy_envy_tree1")
     penv.pbutils.pbclient.disconnect()
     return
 

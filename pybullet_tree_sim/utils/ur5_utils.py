@@ -23,6 +23,8 @@ class UR5:
         self, con, robot_urdf_path: str, pos=[0, 0, 0], orientation=[0, 0, 0, 1], randomize_pose=False, verbose=1
     ) -> None:
         assert isinstance(robot_urdf_path, str)
+        
+        self.static_frames = {} # TODO: Add static frames from URDF
 
         self.con = con
         self.init_pos = pos
@@ -50,7 +52,9 @@ class UR5:
         self.init_pos_base = None
         self.init_pos_eebase = None
         self.robot_urdf_path = robot_urdf_path
-        self.camera_base_offset = np.array([-0.063179, 0.077119, 0.0420027]) # TODO: make init arg
+        
+        
+        self.camera_base_offset = np.array([-0.063179, 0.077119, 0.0420027]) # TODO: make init arg and/or load from URDF
         self.verbose = verbose
 
         self.setup_ur5_arm()  # Changes pos and orientation if randomize is True

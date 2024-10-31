@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
-from pybullet_tree_sim import MESHES_PATH, URDF_PATH, RGB_LABEL, ROBOT_URDF_PATH
+from pybullet_tree_sim import CONFIG_PATH, MESHES_PATH, URDF_PATH, RGB_LABEL, ROBOT_URDF_PATH
 from pybullet_tree_sim.tree import Tree, TreeException
 from pybullet_tree_sim.utils.ur5_utils import UR5
 from pybullet_tree_sim.utils.pyb_utils import PyBUtils
 import pybullet_tree_sim.utils.xacro_utils as xutils
+import pybullet_tree_sim.utils.yaml_utils as yutils
+
+# from final_approach_controller.cut_point_rotate_axis_controller import CutPointRotateAxisController
 
 
 from collections import defaultdict
@@ -47,7 +50,7 @@ class PruningEnv(gym.Env):
 
     _supports_and_post_xacro_path = os.path.join(URDF_PATH, "supports_and_post", "supports_and_post.urdf.xacro")
     _supports_and_post_urdf_path = os.path.join(URDF_PATH, "supports_and_post", "supports_and_post.urdf")
-    _shapes_xacro_dir= os.path.join(URDF_PATH, "shapes", "")
+    _shapes_xacro_dir= os.path.join(URDF_PATH, "shapes")
 
 
     def __init__(
@@ -103,7 +106,24 @@ class PruningEnv(gym.Env):
         self.tree_count = tree_count
         self.is_goal_state = False
 
-        # Camera params # TODO: Move to Camera class
+        # sensor types
+        self.sensor_attributes = {} # TODO: Load sensor types from config files
+        camera_configs_path = os.path.join(CONFIG_PATH, "camera")
+        camera_configs_files = glob.glob(os.path.join(camera_configs_path, "*.yaml"))
+        for file in camera_configs_files:
+            yamlcontent = yutils.load_yaml(file)
+            for key, value in yamlcontent.items():
+                self.sensor_attributes[key] = value
+
+        tof_configs_path = os.path.join(CONFIG_PATH, "tof")
+        tof_configs_files = glob.glob(os.path.join(tof_configs_path, "*.yaml"))
+        for file in tof_configs_files:
+            yamlcontent = yutils.load_yaml(file)
+            for key, value in yamlcontent.items():
+                self.sensor_attributes[key] = value
+
+        # log.warning(self.sensor_attributes)
+
         self.cam_width = cam_width
         self.cam_height = cam_height
         self.cam_pan = 0
@@ -297,23 +317,30 @@ class PruningEnv(gym.Env):
         @param radius (float, Optional): if
         @return None
         """
+        log.warning(locals())
         shape = shape.strip().lower()
         shape_xacro_path = os.path.join(self._shapes_xacro_dir, shape, f"{shape}.urdf.xacro")
         shape_urdf_path = os.path.join(self._shapes_xacro_dir, shape, f"{shape}.urdf")
 
+        shape_mappings = {}
+        for key, value in kwargs.items():
+            shape_mappings[key] = str(value)
+
+        # shape position is the center of the shape, move up by half the height
         if position is None:
-            position = [0,0,0]
+            position = [0,0,float(shape_mappings["height"])/2]
         if orientation is None:
             orientation = [0,0,0,1]
         else:
             orientation = Rotation.from_euler('xyz', orientation).as_quat()
 
+        print(position)
+
         # if shape == "cylinder":
         #     radius = kwargs.get('radius')
         #     height = kwargs.get('height')
 
-        shape_mappings = kwargs
-        
+
         urdf_content = xutils.load_urdf_from_xacro(xacro_path=shape_xacro_path, mappings=shape_mappings).toprettyxml()
         xutils.save_urdf(urdf_content=urdf_content, urdf_path=shape_urdf_path)
 
@@ -325,7 +352,7 @@ class PruningEnv(gym.Env):
         return
 
 
-    def deproject_pixels_to_points(self, data: np.ndarray, view_matrix: np.ndarray) -> np.ndarray:
+    def deproject_pixels_to_points(self, data: np.ndarray, view_matrix: np.ndarray, return_frame: str = 'world') -> np.ndarray:
         """Compute world XYZ from image XY and measured depth.
         (pixel_coords -- [u,v]) -> (film_coords -- [x,y]) -> (camera_coords -- [X, Y, Z]) -> (world_coords -- [U, V, W])
 
@@ -335,7 +362,8 @@ class PruningEnv(gym.Env):
 
         @param data: nx1 array of depth values, Fortran order (column-first)
         @param view_matrix: 4x4 matrix (world -> camera transform)
-        
+        @param return_frame: str, either 'camera' or 'world'
+
         @return: nx4 array of world XYZ coordinates
         """
 
@@ -353,13 +381,17 @@ class PruningEnv(gym.Env):
         # data = depth.reshape((self.cam_width * self.cam_height, 1), order="F")
 
 
-        # Get camera intrinsics from projection matrix
+        # Get camera intrinsics from projection matrix. If square camera, these should be the same.
         fx = proj_matrix[0, 0]
         fy = proj_matrix[1, 1]  # if square camera, these should be the same
 
         # Get camera coordinates from film-plane coordinates. Scale, add z (depth), then homogenize the matrix.
         cam_coords = np.divide(np.multiply(self.film_plane_coords, data), [fx, fy])
         cam_coords = np.concatenate((cam_coords, data, np.ones((self.cam_width * self.cam_height, 1))), axis=1)
+
+        if return_frame.strip().lower() == 'camera':
+            return cam_coords
+
 
         world_coords = (mr.TransInv(view_matrix) @ cam_coords.T).T
 
@@ -369,6 +401,26 @@ class PruningEnv(gym.Env):
             self.debug_plots(data=data, cam_coords=cam_coords, world_coords=world_coords, view_matrix=view_matrix)
 
         return world_coords
+
+    def get_cam_to_frame_coords(self, cam_coords: np.ndarray, start_frame: str, end_frame: str = 'world', view_matrix: np.ndarray | None = None) -> np.ndarray:
+        """Convert camera coordinates to other frame coordinates. Default is world.
+        @param cam_coords: nx4 array of camera XYZ coordinates
+        @param start_frame: str
+        @param end_frame: str (default = 'world')
+        @param view_matrix: 4x4 matrix (world -> camera transform)
+
+        @return: nx4 array of world XYZ coordinates
+        """
+        end_frame = end_frame.strip().lower()
+        if end_frame == 'world' and view_matrix is None:
+            raise ValueError("View matrix required for world frame conversion.")
+        elif end_frame == 'world':
+            return (mr.TransInv(view_matrix) @ cam_coords.T).T
+
+        start_frame = start_frame.strip().lower()
+        end_frame_coords = (mr.TransInv(self.ur5.static_frames[f'{start_frame}_to_{end_frame}']) @ cam_coords.T).T
+
+        return end_frame_coords
 
     def compute_deprojected_point_mask(self):
         # TODO: Make this function nicer
@@ -508,6 +560,8 @@ class PruningEnv(gym.Env):
                     self.last_button_push_time = time.time()
                 else:
                     log.warning("debouce time not yet reached")
+            if ord('o') in keys_pressed:
+                pass
             if ord('t') in keys_pressed:
                 # env.force_time_limit()
                 infos = {}
