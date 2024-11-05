@@ -3,6 +3,7 @@
 
 from pybullet_tree_sim.camera import Camera
 from pybullet_tree_sim.utils import camera_helpers
+from pybullet_tree_sim.utils.pyb_utils import PyBUtils
 import pybullet_tree_sim.utils.yaml_utils as yutils
 
 
@@ -10,18 +11,19 @@ import os
 from zenlog import log
 
 class TimeOfFlight(Camera):
-    def __init__(self, cam_width: int, cam_height: int, sensor_name: str, sensor_type: str = "tof") -> None:
+    def __init__(self, pbutils: PyBUtils, sensor_name: str, sensor_type: str = "tof") -> None:
         """Builds a ToF camera object from a base Camera class"""
-        super().__init__(cam_width=cam_width, cam_height=cam_height, sensor_name=sensor_name, sensor_type=sensor_type)
+        super().__init__(pbutils=pbutils, sensor_name=sensor_name, sensor_type=sensor_type)
         
         
         return
 
 
 def main():
-    tof = TimeOfFlight(sensor_name="vl53l8cx", cam_width=64, cam_height=64)
+    pbutils = PyBUtils(renders=False, cam_width=8, cam_height=8, dfov=65)
+    tof = TimeOfFlight(pbutils, sensor_name="vl53l8cx")
     print(tof.params)
-
+    
     return
 
 

@@ -53,10 +53,12 @@ class PyBUtils:
         # self.enable_gravity()
         self.disable_gravity()
         self.pbclient.setRealTimeSimulation(False)
+        
+        
         self.proj_mat = self.pbclient.computeProjectionMatrixFOV(  # pass in the VERTICAL field of view.
             fov=self.fov[0], aspect=self.cam_width / self.cam_height, nearVal=self.near_val, farVal=self.far_val
         )
-
+        
         self.pbclient.resetDebugVisualizerCamera(
             cameraDistance=1.06, cameraYaw=-120.3, cameraPitch=-12.48, cameraTargetPosition=[-0.3, -0.06, 0.4]
         )
