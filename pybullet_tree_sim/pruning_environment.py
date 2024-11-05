@@ -58,8 +58,8 @@ class PruningEnv(gym.Env):
         # angle_threshold_perp: float = 0.52,
         # angle_threshold_point: float = 0.52,
         pbutils: PyBUtils,
-        cam_width: int = 424,
-        cam_height: int = 240,
+        # cam_width: int = 424,
+        # cam_height: int = 240,
         evaluate: bool = False,
         # distance_threshold: float = 0.05,
         max_steps: int = 1000,
@@ -124,20 +124,20 @@ class PruningEnv(gym.Env):
 
         # log.warning(self.sensor_attributes)
 
-        self.cam_width = cam_width
-        self.cam_height = cam_height
-        self.cam_pan = 0
-        self.cam_tilt = 0
-        # self.cam_xyz_offset = np.zeros(3)
-        self.cam_xyz_offset = np.array([0, 0, 0])
+        # self.cam_width = cam_width
+        # self.cam_height = cam_height
+        # self.cam_pan = 0
+        # self.cam_tilt = 0
+        # # self.cam_xyz_offset = np.zeros(3)
+        # self.cam_xyz_offset = np.array([0, 0, 0])
 
-        # Camera stuff
-        self.pixel_coords = np.array(list(np.ndindex((cam_width, cam_height))), dtype=int)  # C-style
-        # Find the pixel coordinates in the film plane. Bin, offset, normalize, then scale to [-1, 1]
-        self.film_plane_coords = np.zeros((cam_width, cam_height, 2), dtype=float)
-        self.film_plane_coords = 2 * np.divide(
-            np.subtract(np.add(self.pixel_coords, [0.5, 0.5]), [cam_width / 2, cam_height / 2]), [cam_width, cam_height]
-        )
+        # # Camera stuff
+        # self.pixel_coords = np.array(list(np.ndindex((cam_width, cam_height))), dtype=int)  # C-style
+        # # Find the pixel coordinates in the film plane. Bin, offset, normalize, then scale to [-1, 1]
+        # self.film_plane_coords = np.zeros((cam_width, cam_height, 2), dtype=float)
+        # self.film_plane_coords = 2 * np.divide(
+        #     np.subtract(np.add(self.pixel_coords, [0.5, 0.5]), [cam_width / 2, cam_height / 2]), [cam_width, cam_height]
+        # )
 
         self.verbose = verbose
 
