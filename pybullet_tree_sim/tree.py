@@ -430,7 +430,7 @@ class Tree:
         position: str = "0.0 0.0 0.0",
         orientation: str = "0.0 0.0 0.0",
         save_urdf: bool = True,
-        regenerate_urdf: bool = False, # TODO: make save/regenerate work well together. Will need to add delete URDF function
+        regenerate_urdf: bool = False,  # TODO: make save/regenerate work well together. Will need to add delete URDF function
     ) -> tuple[str, str]:
         """Load a tree URDF from a given path or generate a tree URDF from a xacro file. Returns the URDF content.
         If `tree_urdf_path` is not None, then load that URDF.
@@ -456,7 +456,9 @@ class Tree:
                     "rpy": orientation,
                 }
                 # If the tree macro information doesn't describe a generated file, generate it using the generic tree xacro.
-                urdf_content = xutils.load_urdf_from_xacro(xacro_path=Tree._tree_xacro_path, mappings=urdf_mappings).toprettyxml()
+                urdf_content = xutils.load_urdf_from_xacro(
+                    xacro_path=Tree._tree_xacro_path, mappings=urdf_mappings
+                ).toprettyxml()
                 xutils.save_urdf(urdf_content=urdf_content, urdf_path=urdf_path)
                 log.info(f"Saved URDF to file '{urdf_path}'.")
             else:

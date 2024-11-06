@@ -12,3 +12,5 @@ depth:
     hfov: 87
     vfov: 58
     fps: 30
+    near_plane: 0.105
+    far_plane: 10.0
