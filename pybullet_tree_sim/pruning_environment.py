@@ -50,8 +50,7 @@ class PruningEnv(gym.Env):
 
     _supports_and_post_xacro_path = os.path.join(URDF_PATH, "supports_and_post", "supports_and_post.urdf.xacro")
     _supports_and_post_urdf_path = os.path.join(URDF_PATH, "supports_and_post", "supports_and_post.urdf")
-    _shapes_xacro_dir= os.path.join(URDF_PATH, "shapes")
-
+    _shapes_xacro_dir = os.path.join(URDF_PATH, "shapes")
 
     def __init__(
         self,
@@ -107,7 +106,7 @@ class PruningEnv(gym.Env):
         self.is_goal_state = False
 
         # sensor types
-        self.sensor_attributes = {} # TODO: Load sensor types from config files
+        self.sensor_attributes = {}  # TODO: Load sensor types from config files
         camera_configs_path = os.path.join(CONFIG_PATH, "camera")
         camera_configs_files = glob.glob(os.path.join(camera_configs_path, "*.yaml"))
         for file in camera_configs_files:
@@ -164,7 +163,9 @@ class PruningEnv(gym.Env):
 
         # UR5 Robot
         if load_robot:
-            self.ur5 = self.load_robot(type=robot_type, robot_pos=robot_pos, robot_orientation=robot_orientation, randomize_pose=False)
+            self.ur5 = self.load_robot(
+                type=robot_type, robot_pos=robot_pos, robot_orientation=robot_orientation, randomize_pose=False
+            )
         return
 
     def load_robot(self, type: str, robot_pos: ArrayLike, robot_orientation: ArrayLike, randomize_pose: bool = False):
@@ -184,7 +185,7 @@ class PruningEnv(gym.Env):
             raise NotImplementedError(f"Robot type {type} not implemented")
         return robot
 
-    def load_tree( # TODO: Clean up Tree init vs create_tree, probably not needed. Too many file checks.
+    def load_tree(  # TODO: Clean up Tree init vs create_tree, probably not needed. Too many file checks.
         self,
         pbutils: PyBUtils,
         scale: float,
@@ -283,7 +284,9 @@ class PruningEnv(gym.Env):
         if orientation is None:
             orientation = Rotation.from_euler("xyz", [np.pi / 2, 0, np.pi / 2]).as_quat()
 
-        if not os.path.exists(self._supports_and_post_urdf_path): # TODO: change this -- it'll take a improperly positioned file and keep using it.'
+        if not os.path.exists(
+            self._supports_and_post_urdf_path
+        ):  # TODO: change this -- it'll take a improperly positioned file and keep using it.'
             urdf_content = xutils.load_urdf_from_xacro(
                 xacro_path=self._supports_and_post_xacro_path, mappings=None
             ).toprettyxml()  # TODO: add mappings
@@ -309,7 +312,9 @@ class PruningEnv(gym.Env):
         # self.pbutils.pbclient.resetSimulation()
         return
 
-    def activate_shape(self, shape: str, position: ArrayLike | None = None, orientation: ArrayLike | None = None, **kwargs) -> None:
+    def activate_shape(
+        self, shape: str, position: ArrayLike | None = None, orientation: ArrayLike | None = None, **kwargs
+    ) -> None:
         """Activate a generic cylinder object in the environment.
         @param shape (str): shape type. Currently supported options are: [cylinder]
         @param position (ArrayLike): Vector containing the xyz position of the base. Cylinder default position is the center of the cylinder.
@@ -328,18 +333,17 @@ class PruningEnv(gym.Env):
 
         # shape position is the center of the shape, move up by half the height
         if position is None:
-            position = [0,0,float(shape_mappings["height"])/2]
+            position = [0, 0, float(shape_mappings["height"]) / 2]
         if orientation is None:
-            orientation = [0,0,0,1]
+            orientation = [0, 0, 0, 1]
         else:
-            orientation = Rotation.from_euler('xyz', orientation).as_quat()
+            orientation = Rotation.from_euler("xyz", orientation).as_quat()
 
         print(position)
 
         # if shape == "cylinder":
         #     radius = kwargs.get('radius')
         #     height = kwargs.get('height')
-
 
         urdf_content = xutils.load_urdf_from_xacro(xacro_path=shape_xacro_path, mappings=shape_mappings).toprettyxml()
         xutils.save_urdf(urdf_content=urdf_content, urdf_path=shape_urdf_path)
@@ -351,8 +355,9 @@ class PruningEnv(gym.Env):
 
         return
 
-
-    def deproject_pixels_to_points(self, data: np.ndarray, view_matrix: np.ndarray, return_frame: str = 'world') -> np.ndarray:
+    def deproject_pixels_to_points(
+        self, data: np.ndarray, view_matrix: np.ndarray, return_frame: str = "world"
+    ) -> np.ndarray:
         """Compute world XYZ from image XY and measured depth.
         (pixel_coords -- [u,v]) -> (film_coords -- [x,y]) -> (camera_coords -- [X, Y, Z]) -> (world_coords -- [U, V, W])
 
@@ -367,7 +372,6 @@ class PruningEnv(gym.Env):
         @return: nx4 array of world XYZ coordinates
         """
 
-
         # log.debug(f"View matrix:\n{view_matrix}")
 
         # Flip the y and z axes to convert from OpenGL camera frame to standard camera frame.
@@ -376,10 +380,8 @@ class PruningEnv(gym.Env):
         # view_matrix[1:3, :] = -view_matrix[1:3, :]
         proj_matrix = np.asarray(self.pbutils.proj_mat).reshape([4, 4], order="F")
 
-
         # rgb, depth = self.pbutils.get_rgbd_at_cur_pose(type='robot', view_matrix=view_matrix)
         # data = depth.reshape((self.cam_width * self.cam_height, 1), order="F")
-
 
         # Get camera intrinsics from projection matrix. If square camera, these should be the same.
         fx = proj_matrix[0, 0]
@@ -389,12 +391,10 @@ class PruningEnv(gym.Env):
         cam_coords = np.divide(np.multiply(self.film_plane_coords, data), [fx, fy])
         cam_coords = np.concatenate((cam_coords, data, np.ones((self.cam_width * self.cam_height, 1))), axis=1)
 
-        if return_frame.strip().lower() == 'camera':
+        if return_frame.strip().lower() == "camera":
             return cam_coords
 
-
         world_coords = (mr.TransInv(view_matrix) @ cam_coords.T).T
-
 
         plot = True
         if plot:
@@ -402,7 +402,9 @@ class PruningEnv(gym.Env):
 
         return world_coords
 
-    def get_cam_to_frame_coords(self, cam_coords: np.ndarray, start_frame: str, end_frame: str = 'world', view_matrix: np.ndarray | None = None) -> np.ndarray:
+    def get_cam_to_frame_coords(
+        self, cam_coords: np.ndarray, start_frame: str, end_frame: str = "world", view_matrix: np.ndarray | None = None
+    ) -> np.ndarray:
         """Convert camera coordinates to other frame coordinates. Default is world.
         @param cam_coords: nx4 array of camera XYZ coordinates
         @param start_frame: str
@@ -412,13 +414,13 @@ class PruningEnv(gym.Env):
         @return: nx4 array of world XYZ coordinates
         """
         end_frame = end_frame.strip().lower()
-        if end_frame == 'world' and view_matrix is None:
+        if end_frame == "world" and view_matrix is None:
             raise ValueError("View matrix required for world frame conversion.")
-        elif end_frame == 'world':
+        elif end_frame == "world":
             return (mr.TransInv(view_matrix) @ cam_coords.T).T
 
         start_frame = start_frame.strip().lower()
-        end_frame_coords = (mr.TransInv(self.ur5.static_frames[f'{start_frame}_to_{end_frame}']) @ cam_coords.T).T
+        end_frame_coords = (mr.TransInv(self.ur5.static_frames[f"{start_frame}_to_{end_frame}"]) @ cam_coords.T).T
 
         return end_frame_coords
 
@@ -504,74 +506,76 @@ class PruningEnv(gym.Env):
 
     def get_key_action(self, keys_pressed: list) -> np.ndarray:
         """Return an action based on the keys pressed."""
-        action = np.array([0.,0.,0, 0., 0., 0.])
+        action = np.array([0.0, 0.0, 0, 0.0, 0.0, 0.0])
         # keys_pressed = self.get_key_pressed()
         if keys_pressed:
             # TODO: Make these values all sum so that multi-dof actions can be performed
-            if ord('a') in keys_pressed:
+            if ord("a") in keys_pressed:
                 # action = np.array([0.01, 0, 0, 0, 0, 0])
                 action[0] += 0.01
-            if ord('d') in keys_pressed:
+            if ord("d") in keys_pressed:
                 # action = np.array([-0.01, 0, 0, 0, 0, 0])
                 action[0] += -0.01
-            if ord('s') in keys_pressed:
+            if ord("s") in keys_pressed:
                 # action = np.array([0, 0.01, 0, 0, 0, 0])
                 action[1] += 0.01
-            if ord('w') in keys_pressed:
+            if ord("w") in keys_pressed:
                 # action = np.array([0, -0.01, 0, 0, 0, 0])
                 action[1] += -0.01
-            if ord('q') in keys_pressed:
+            if ord("q") in keys_pressed:
                 # action = np.array([0, 0, 0.01, 0, 0, 0])
                 action[2] += 0.01
-            if ord('e') in keys_pressed:
+            if ord("e") in keys_pressed:
                 # action = np.array([0, 0, -0.01, 0, 0, 0])
                 action[2] += -0.01
-            if ord('z') in keys_pressed:
+            if ord("z") in keys_pressed:
                 # action = np.array([0, 0, 0, 0.01, 0, 0])
                 action[3] += 0.01
-            if ord('c') in keys_pressed:
+            if ord("c") in keys_pressed:
                 # action = np.array([0, 0, 0, -0.01, 0, 0])
                 action[3] += -0.01
-            if ord('x') in keys_pressed:
+            if ord("x") in keys_pressed:
                 # action = np.array([0, 0, 0, 0, 0.01, 0])
                 action[4] += 0.01
-            if ord('v') in keys_pressed:
+            if ord("v") in keys_pressed:
                 # action = np.array([0, 0, 0, 0, -0.01, 0])
                 action[4] += -0.01
-            if ord('r') in keys_pressed:
+            if ord("r") in keys_pressed:
                 # action = np.array([0, 0, 0, 0, 0, 0.05])
                 action[5] += 0.05
-            if ord('f') in keys_pressed:
+            if ord("f") in keys_pressed:
                 # action = np.array([0, 0, 0, 0, 0, -0.05])
                 action[5] += -0.05
-            if ord('p') in keys_pressed:
+            if ord("p") in keys_pressed:
 
                 if time.time() - self.last_button_push_time > self.debouce_time:
 
                     # Get view and projection matrices
                     # view_matrix = np.asarray(self.ur5.get_view_mat_at_curr_pose(pan=0, tilt=0, xyz_offset=[0,0,0])).reshape([4, 4], order="F")
-                    view_matrix = self.ur5.get_view_mat_at_curr_pose(pan=0, tilt=0, xyz_offset=[0,0,0])
+                    view_matrix = self.ur5.get_view_mat_at_curr_pose(pan=0, tilt=0, xyz_offset=[0, 0, 0])
                     log.warning(f"button p pressed")
-                    rgb, depth = self.pbutils.get_rgbd_at_cur_pose(type='robot', view_matrix=view_matrix)
+                    rgb, depth = self.pbutils.get_rgbd_at_cur_pose(type="robot", view_matrix=view_matrix)
                     # log.debug(f'depth:\n{depth}')
                     depth = -1 * depth.reshape((self.cam_width * self.cam_height, 1), order="F")
-                    world_points = self.deproject_pixels_to_points(data=depth, view_matrix=np.asarray(view_matrix).reshape([4, 4], order="F"))
+                    world_points = self.deproject_pixels_to_points(
+                        data=depth, view_matrix=np.asarray(view_matrix).reshape([4, 4], order="F")
+                    )
                     # log.debug(f"world_points: {world_points}")
                     self.last_button_push_time = time.time()
                 else:
                     log.warning("debouce time not yet reached")
-            if ord('o') in keys_pressed:
+            if ord("o") in keys_pressed:
                 pass
-            if ord('t') in keys_pressed:
+            if ord("t") in keys_pressed:
                 # env.force_time_limit()
                 infos = {}
-                infos['TimeLimit.truncated'] = True
-                self.reset_environment() # TODO: Write
+                infos["TimeLimit.truncated"] = True
+                self.reset_environment()  # TODO: Write
                 # set_goal_callback._update_tree_properties()
                 # env.is_goal_state = True
 
         else:
-            action = np.array([0.,0.,0, 0., 0., 0.])
+            action = np.array([0.0, 0.0, 0, 0.0, 0.0, 0.0])
             keys_pressed = []
         return action
 
@@ -590,8 +594,8 @@ class PruningEnv(gym.Env):
                     z=_data.flatten(order="C"),
                     mode="markers",
                     ids=np.array([f"{i}" for i in range(self.cam_width * self.cam_height)])
-                        .reshape((8, 8), order="C")
-                        .flatten(order="F"),
+                    .reshape((8, 8), order="C")
+                    .flatten(order="F"),
                     hovertemplate=hovertemplate,
                 )
             ]
@@ -639,7 +643,9 @@ class PruningEnv(gym.Env):
                     y=cam_coords[:, 1],
                     z=cam_coords[:, 2],
                     mode="markers",
-                    ids=[f"{i}" for i in range(self.cam_width * self.cam_height)], # TODO: change these to be counted as in image space
+                    ids=[
+                        f"{i}" for i in range(self.cam_width * self.cam_height)
+                    ],  # TODO: change these to be counted as in image space
                     hovertemplate=hovertemplate,
                 )
             ]
@@ -704,6 +710,7 @@ class PruningEnv(gym.Env):
     def run_sim(self) -> int:
 
         return 0
+
 
 def main():
     # data = np.zeros((cam_width, cam_height), dtype=float)

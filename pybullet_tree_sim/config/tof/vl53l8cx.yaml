@@ -1,7 +1,8 @@
 name: "VL53L8CX"
 data_type: "d"
-dfov: 65.0
-near_plane: 0.03
-far_plane: 3.4
-width: 8
-height: 8
+depth:
+    dfov: 65.0
+    near_plane: 0.03
+    far_plane: 3.4
+    width: 8
+    height: 8
