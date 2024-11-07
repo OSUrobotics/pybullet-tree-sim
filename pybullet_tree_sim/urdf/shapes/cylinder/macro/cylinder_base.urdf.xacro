@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<robot name="tree" xmlns:xacro="http://ros.org/wiki/xacro">
+<robot name="cylinder" xmlns:xacro="http://ros.org/wiki/xacro">
 
     <xacro:macro name="cylinder" params="namespace radius height mass parent *origin">
         <xacro:include filename="./macro/cylinder_macro.urdf.xacro"/> <!-- TODO: get absolute file paths? -->

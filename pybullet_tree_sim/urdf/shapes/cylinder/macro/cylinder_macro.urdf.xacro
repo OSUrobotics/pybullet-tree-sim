@@ -33,7 +33,7 @@
             </inertial>
         </link>
         <link name="world"/>
-        <joint name="shape-world_joint" type="fixed">
+        <joint name="cylinder-world-joint" type="fixed">
             <parent link="${parent}"/>
             <child link="cylinder"/>
             <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"/>

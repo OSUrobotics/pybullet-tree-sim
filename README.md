@@ -1,9 +1,15 @@
 ## TODO
+1. For Claire: 
+    1. Generic URDF to Generic Robot class
+    1. Fill out the `object_loader.py` class. Activate/deactivate trees, supports, robots.
+1. Format the final approach controller as a python subpackage?
+    1. https://packaging.python.org/en/latest/guides/packaging-namespace-packages/#packaging-namespace-packages
 1. Add basic cylinder to world. Dynamically create URDF.
 1. Separate camera class
     1. ToF class inherits camera classs
 1. Dynamically populate UR URDF. Allow for various end-effectors and robot configurations.
-    1. Make sure to include camera and other sensors.
+    1. Make sure to include camera and other sensors. (Source manifold mesh -- utils -> camera class (C++))
+    1. Dynamic parent joint for Panda to slider/farm-ng (like UR5)
 1. Add generic robot class (from Abhinav's code)
     1. Panda/UR5
     1. End-effector
