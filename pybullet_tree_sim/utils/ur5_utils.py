@@ -24,6 +24,8 @@ class UR5:
     ) -> None:
         assert isinstance(robot_urdf_path, str)
 
+        self.static_frames = {}  # TODO: Add static frames from URDF
+
         self.con = con
         self.init_pos = pos
         self.init_orientation = orientation
@@ -50,7 +52,10 @@ class UR5:
         self.init_pos_base = None
         self.init_pos_eebase = None
         self.robot_urdf_path = robot_urdf_path
-        self.camera_base_offset = np.array([0.063179, 0.077119, 0.0420027])
+
+        self.camera_base_offset = np.array(
+            [-0.063179, 0.077119, 0.0420027]
+        )  # TODO: make init arg and/or load from URDF
         self.verbose = verbose
 
         self.setup_ur5_arm()  # Changes pos and orientation if randomize is True
@@ -151,7 +156,7 @@ class UR5:
         # log.warning(f"base_pos: {base_pos}, base_or: {base_or}")
         # log.warning(f"eef_pos: {eef_pos}, eef_or: {eef_or}")
         #
-        log.debug(self.joint_info)
+        # log.debug(self.joint_info)
         return
 
     def reset_ur5_arm(self) -> None:
@@ -295,6 +300,18 @@ class UR5:
         jacobian = self.calculate_jacobian()
         inv_jacobian = np.linalg.pinv(jacobian)
         joint_velocities = np.matmul(inv_jacobian, end_effector_velocity).astype(np.float32)
+        return joint_velocities, jacobian
+
+    def calculate_joint_velocities_from_ee_velocity_dls(
+        self, end_effector_velocity: NDArray[Shape["6, 1"], Float], damping_factor: float = 0.05
+    ) -> Tuple[ndarray, ndarray]:
+        """Calculate joint velocities from end effector velocity using damped least squares"""
+        jacobian = self.calculate_jacobian()
+        identity_matrix = np.eye(jacobian.shape[0])
+        damped_matrix = jacobian @ jacobian.T + (damping_factor ** 2) * identity_matrix
+        damped_matrix_inv = np.linalg.inv(damped_matrix)
+        dls_inv_jacobian = jacobian.T @ damped_matrix_inv
+        joint_velocities = dls_inv_jacobian @ end_effector_velocity
         return joint_velocities, jacobian
 
     def get_joint_angles(self) -> Tuple[float, float, float, float, float, float]:

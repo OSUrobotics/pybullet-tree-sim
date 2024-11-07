@@ -1,0 +1,16 @@
+name: "RealSense D435i"
+data_type: "rgbd"
+rgb:
+    width: 640
+    height: 480
+    hfov: 69
+    vfov: 42
+    fps: 30
+depth:
+    width: 640
+    height: 480
+    hfov: 87
+    vfov: 58
+    fps: 30
+    near_plane: 0.105
+    far_plane: 10.0
