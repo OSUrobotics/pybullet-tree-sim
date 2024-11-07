@@ -20,10 +20,15 @@ class Camera(Sensor):
     def __init__(self, pbutils, sensor_name: str, sensor_type: str = "camera") -> None:
         # load sensor parameters from yaml file
         super().__init__(sensor_name, sensor_type)
+        self.pan = 0
+        self.tilt = 0
+        self.tf_frame: str = ''
 
         # Only dealing with depth data for now, TODO: add RGB data
         self.depth_width = self.params["depth"]["width"]
         self.depth_height = self.params["depth"]["height"]
+        
+        # Some optical sensors only provide diagonal field of view, get horizontal and vertical from diagonal
         try:
             vfov = self.params["depth"]["vfov"]
         except KeyError:

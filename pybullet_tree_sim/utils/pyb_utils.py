@@ -138,7 +138,7 @@ class PyBUtils:
         sphereUid = self.pbclient.createMultiBody(0.0, colSphereId, visualShapeId, pos, [0, 0, 0, 1])
         return sphereUid
 
-    def get_image_at_curr_pose(self, camera: "Camera", type, view_matrix=None) -> List:
+    def get_image_at_curr_pose(self, camera, type, view_matrix=None) -> List:
         """Take the current pose of the end effector and set the camera to that pose"""
         if type == "robot":
             if view_matrix is None:
@@ -192,10 +192,10 @@ class PyBUtils:
             depth_linearized = None
         return depth_linearized
 
-    def get_rgbd_at_cur_pose(self, camera: "Camera", type, view_matrix) -> Tuple[NDArray, NDArray]:
+    def get_rgbd_at_cur_pose(self, camera, type, view_matrix) -> Tuple[NDArray, NDArray]:
         """Get RGBD image at current pose"""
         # cur_p = self.ur5.get_current_pose(self.camera_link_index)
-        rgbd = self.get_image_at_curr_pose(type, view_matrix)
+        rgbd = self.get_image_at_curr_pose(camera, type, view_matrix)
         rgb, depth = self.seperate_rgbd_rgb_d(rgbd, height=camera.depth_height, width=camera.depth_width)
         depth = depth.astype(np.float32)
         depth = self.linearize_depth(depth, self.far_val, self.near_val)

@@ -339,7 +339,7 @@ class PruningEnv(gym.Env):
         else:
             orientation = Rotation.from_euler("xyz", orientation).as_quat()
 
-        print(position)
+        # print(position)
 
         # if shape == "cylinder":
         #     radius = kwargs.get('radius')
@@ -356,9 +356,9 @@ class PruningEnv(gym.Env):
         return
 
     def deproject_pixels_to_points(
-        self, data: np.ndarray, view_matrix: np.ndarray, return_frame: str = "world"
+        self, camera, data: np.ndarray, view_matrix: np.ndarray, return_frame: str = "world"
     ) -> np.ndarray:
-        """Compute world XYZ from image XY and measured depth.
+        """Compute frame XYZ from image XY and measured depth. Default frame is 'world'.
         (pixel_coords -- [u,v]) -> (film_coords -- [x,y]) -> (camera_coords -- [X, Y, Z]) -> (world_coords -- [U, V, W])
 
         https://ksimek.github.io/2013/08/13/intrinsic/
@@ -378,7 +378,7 @@ class PruningEnv(gym.Env):
         # https://stackoverflow.com/questions/4124041/is-opengl-coordinate-system-left-handed-or-right-handed
         # https://github.com/bitlw/LearnProjMatrix/blob/main/doc/OpenGL_Projection.md#introduction
         # view_matrix[1:3, :] = -view_matrix[1:3, :]
-        proj_matrix = np.asarray(self.pbutils.proj_mat).reshape([4, 4], order="F")
+        proj_matrix = np.asarray(camera.depth_proj_mat).reshape([4, 4], order="F")
 
         # rgb, depth = self.pbutils.get_rgbd_at_cur_pose(type='robot', view_matrix=view_matrix)
         # data = depth.reshape((self.cam_width * self.cam_height, 1), order="F")
@@ -388,17 +388,17 @@ class PruningEnv(gym.Env):
         fy = proj_matrix[1, 1]  # if square camera, these should be the same
 
         # Get camera coordinates from film-plane coordinates. Scale, add z (depth), then homogenize the matrix.
-        cam_coords = np.divide(np.multiply(self.film_plane_coords, data), [fx, fy])
-        cam_coords = np.concatenate((cam_coords, data, np.ones((self.cam_width * self.cam_height, 1))), axis=1)
+        cam_coords = np.divide(np.multiply(camera.depth_film_coords, data), [fx, fy])
+        cam_coords = np.concatenate((cam_coords, data, np.ones((camera.depth_width * camera.depth_height, 1))), axis=1)
 
         if return_frame.strip().lower() == "camera":
             return cam_coords
 
         world_coords = (mr.TransInv(view_matrix) @ cam_coords.T).T
 
-        plot = True
+        plot = False
         if plot:
-            self.debug_plots(data=data, cam_coords=cam_coords, world_coords=world_coords, view_matrix=view_matrix)
+            self.debug_plots(camera=camera, data=data, cam_coords=cam_coords, world_coords=world_coords, view_matrix=view_matrix)
 
         return world_coords
 
@@ -507,51 +507,34 @@ class PruningEnv(gym.Env):
     def get_key_action(self, keys_pressed: list) -> np.ndarray:
         """Return an action based on the keys pressed."""
         action = np.array([0.0, 0.0, 0, 0.0, 0.0, 0.0])
-        # keys_pressed = self.get_key_pressed()
         if keys_pressed:
-            # TODO: Make these values all sum so that multi-dof actions can be performed
             if ord("a") in keys_pressed:
-                # action = np.array([0.01, 0, 0, 0, 0, 0])
                 action[0] += 0.01
             if ord("d") in keys_pressed:
-                # action = np.array([-0.01, 0, 0, 0, 0, 0])
                 action[0] += -0.01
             if ord("s") in keys_pressed:
-                # action = np.array([0, 0.01, 0, 0, 0, 0])
                 action[1] += 0.01
             if ord("w") in keys_pressed:
-                # action = np.array([0, -0.01, 0, 0, 0, 0])
                 action[1] += -0.01
             if ord("q") in keys_pressed:
-                # action = np.array([0, 0, 0.01, 0, 0, 0])
                 action[2] += 0.01
             if ord("e") in keys_pressed:
-                # action = np.array([0, 0, -0.01, 0, 0, 0])
                 action[2] += -0.01
             if ord("z") in keys_pressed:
-                # action = np.array([0, 0, 0, 0.01, 0, 0])
                 action[3] += 0.01
             if ord("c") in keys_pressed:
-                # action = np.array([0, 0, 0, -0.01, 0, 0])
                 action[3] += -0.01
             if ord("x") in keys_pressed:
-                # action = np.array([0, 0, 0, 0, 0.01, 0])
                 action[4] += 0.01
             if ord("v") in keys_pressed:
-                # action = np.array([0, 0, 0, 0, -0.01, 0])
                 action[4] += -0.01
             if ord("r") in keys_pressed:
-                # action = np.array([0, 0, 0, 0, 0, 0.05])
                 action[5] += 0.05
             if ord("f") in keys_pressed:
-                # action = np.array([0, 0, 0, 0, 0, -0.05])
                 action[5] += -0.05
             if ord("p") in keys_pressed:
-
                 if time.time() - self.last_button_push_time > self.debouce_time:
-
                     # Get view and projection matrices
-                    # view_matrix = np.asarray(self.ur5.get_view_mat_at_curr_pose(pan=0, tilt=0, xyz_offset=[0,0,0])).reshape([4, 4], order="F")
                     view_matrix = self.ur5.get_view_mat_at_curr_pose(pan=0, tilt=0, xyz_offset=[0, 0, 0])
                     log.warning(f"button p pressed")
                     rgb, depth = self.pbutils.get_rgbd_at_cur_pose(type="robot", view_matrix=view_matrix)
@@ -579,133 +562,6 @@ class PruningEnv(gym.Env):
             keys_pressed = []
         return action
 
-    def debug_plots(self, data, cam_coords, world_coords, view_matrix):
-        import plotly.graph_objects as go
-
-        hovertemplate = "id: %{id}<br>x: %{x}<br>y: %{y}<br>z: %{z}<extra></extra>"
-
-        _data = data.reshape([self.cam_width, self.cam_height], order="F")
-        _data = _data.reshape((self.cam_width * self.cam_height, 1), order="C")
-        fig = go.Figure(
-            data=[
-                go.Scatter3d(
-                    x=list(range(8)) * 8,
-                    y=np.array([list(range(8))] * 8).T.flatten(order="C"),
-                    z=_data.flatten(order="C"),
-                    mode="markers",
-                    ids=np.array([f"{i}" for i in range(self.cam_width * self.cam_height)])
-                    .reshape((8, 8), order="C")
-                    .flatten(order="F"),
-                    hovertemplate=hovertemplate,
-                )
-            ]
-        )
-        fig.update_layout(
-            title="Pixel Coordinates",
-            scene=dict(
-                aspectmode="cube",
-                camera=dict(
-                    up=dict(x=0, y=0, z=1),
-                    center=dict(x=0, y=0, z=0),
-                    eye=dict(x=-1.25, y=-1.25, z=1.25),
-                ),
-            ),
-        )
-        fig.show()
-        fig = go.Figure(
-            data=[
-                go.Scatter3d(
-                    x=self.film_plane_coords[:, 0],
-                    y=self.film_plane_coords[:, 1],
-                    z=data.flatten(order="F"),
-                    mode="markers",
-                    ids=[f"{i}" for i in range(self.cam_width * self.cam_height)],
-                    hovertemplate=hovertemplate,
-                )
-            ]
-        )
-        fig.update_layout(
-            title="Film Coordinates",
-            scene=dict(
-                aspectmode="cube",
-                camera=dict(
-                    up=dict(x=0, y=0, z=1),
-                    center=dict(x=0, y=0, z=0),
-                    eye=dict(x=-1.25, y=-1.25, z=1.25),
-                ),
-            ),
-        )
-        fig.show()
-        fig = go.Figure(
-            data=[
-                go.Scatter3d(
-                    x=cam_coords[:, 0],
-                    y=cam_coords[:, 1],
-                    z=cam_coords[:, 2],
-                    mode="markers",
-                    ids=[
-                        f"{i}" for i in range(self.cam_width * self.cam_height)
-                    ],  # TODO: change these to be counted as in image space
-                    hovertemplate=hovertemplate,
-                )
-            ]
-        )  # reverse sign of z to match world coords
-        fig.update_layout(
-            title="Camera Coordinates",
-            scene=dict(
-                aspectmode="cube",
-                camera=dict(
-                    up=dict(x=0, y=0, z=1),
-                    center=dict(x=0, y=0, z=0),
-                    eye=dict(x=-1.25, y=-1.25, z=1.25),
-                ),
-            ),
-        )
-        fig.show()
-        fig = go.Figure(
-            data=[
-                go.Scatter3d(
-                    x=world_coords[:, 0],
-                    y=world_coords[:, 1],
-                    z=world_coords[:, 2],
-                    name="tof_data",
-                    mode="markers",
-                    marker=dict(size=2),
-                    ids=np.array([f"{i}" for i in range(self.cam_width * self.cam_height)]),
-                    hovertemplate=hovertemplate,
-                )
-            ]
-        )
-        inv_view_matrix = mr.TransInv(view_matrix)
-        fig.add_trace(
-            go.Scatter3d(
-                x=[inv_view_matrix[0, 3]],
-                y=[inv_view_matrix[1, 3]],
-                z=[inv_view_matrix[2, 3]],
-                mode="markers",
-                name="camera_origin",
-                marker=dict(size=5),
-            )
-        )
-        fig.update_layout(
-            title="World Coordinates",
-            scene=dict(
-                aspectmode="cube",
-                xaxis=dict(range=[-1.0, 1.0]),
-                yaxis=dict(range=[-1.0, 1.0]),
-                zaxis=dict(range=[-0.0, 2.1]),
-                camera=dict(
-                    up=dict(x=0, y=0, z=1),
-                    center=dict(x=0, y=0, z=0),
-                    eye=dict(x=-1.5, y=-1.5, z=1.5),
-                ),
-            ),
-        )
-        fig.show()
-
-        # log.warn(f"view_matrix: {view_matrix}")
-        # log.warn(f"inv_view_matrix: {inv_view_matrix}")
-        return
 
     def run_sim(self) -> int:
 
