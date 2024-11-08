@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from __future__ import annotations
 """
 Author (s): Abhinav Jain, Luke Strohbehn
 """
@@ -12,18 +13,19 @@ from pybullet_utils import bullet_client as bc
 from scipy.constants import g as grav
 
 from pybullet_tree_sim import MESHES_PATH, URDF_PATH, TEXTURES_PATH
-from pybullet_tree_sim.utils.helpers import get_fov_from_dfov
+# from pybullet_tree_sim.camera import Camera
+# from pybullet_tree_sim.utils.camera_helpers import get_fov_from_dfov
 
 from zenlog import log
 
 
 class PyBUtils:
-    def __init__(self, renders: bool = False, cam_height: int = 224, cam_width: int = 224, dfov: int = None) -> None:
+    def __init__(self, renders: bool = False) -> None:
         self.viz_view_matrix = None
         self.viz_proj_matrix = None
         self.renders = renders
-        self.cam_height = cam_height
-        self.cam_width = cam_width
+        # self.cam_height = cam_height
+        # self.cam_width = cam_width
         self.near_val = 0.02
         self.far_val = 4.0
         self.step_time = 1 / 4
@@ -33,10 +35,10 @@ class PyBUtils:
         self.debug_items_reset = []
 
         # Setup
-        if dfov is not None:
-            self.fov: tuple = get_fov_from_dfov(camera_height=cam_height, camera_width=cam_width, dFoV=dfov)
-        else:
-            self.fov: tuple = (60, 60)
+        # if dfov is not None:
+        #     self.fov: tuple = get_fov_from_dfov(camera_height=cam_height, camera_width=cam_width, dFoV=dfov)
+        # else:
+        #     self.fov: tuple = (60, 60)
         self._setup_pybullet()
 
         return
@@ -53,15 +55,17 @@ class PyBUtils:
         # self.enable_gravity()
         self.disable_gravity()
         self.pbclient.setRealTimeSimulation(False)
-        self.proj_mat = self.pbclient.computeProjectionMatrixFOV(  # pass in the VERTICAL field of view.
-            fov=self.fov[0], aspect=self.cam_width / self.cam_height, nearVal=self.near_val, farVal=self.far_val
-        )
 
+        # self.proj_mat = self.pbclient.computeProjectionMatrixFOV(  # pass in the VERTICAL field of view.
+        #     fov=self.fov[0], aspect=self.cam_width / self.cam_height, nearVal=self.near_val, farVal=self.far_val
+        # )
+
+        # TODO: fix this camera problem with Claire
         self.pbclient.resetDebugVisualizerCamera(
             cameraDistance=1.06, cameraYaw=-120.3, cameraPitch=-12.48, cameraTargetPosition=[-0.3, -0.06, 0.4]
         )
         self.create_background()
-        self.setup_bird_view_visualizer()
+        # self.setup_bird_view_visualizer()
         return
 
     def disable_gravity(self):
@@ -134,24 +138,24 @@ class PyBUtils:
         sphereUid = self.pbclient.createMultiBody(0.0, colSphereId, visualShapeId, pos, [0, 0, 0, 1])
         return sphereUid
 
-    def get_image_at_curr_pose(self, type, view_matrix=None) -> List:
+    def get_image_at_curr_pose(self, camera, type, view_matrix=None) -> List:
         """Take the current pose of the end effector and set the camera to that pose"""
         if type == "robot":
             if view_matrix is None:
                 raise ValueError("view_matrix cannot be None for robot view")
             return self.pbclient.getCameraImage(
-                width=self.cam_width,
-                height=self.cam_height,
+                width=camera.depth_width, # TODO: make separate function for rgb?
+                height=camera.depth_height,
                 viewMatrix=view_matrix,
-                projectionMatrix=self.proj_mat,
+                projectionMatrix=camera.depth_proj_mat,
                 renderer=self.pbclient.ER_BULLET_HARDWARE_OPENGL,
                 flags=self.pbclient.ER_NO_SEGMENTATION_MASK,
                 lightDirection=[1, 1, 1],
             )
         elif type == "viz":
             return self.pbclient.getCameraImage(
-                width=self.cam_width,
-                height=self.cam_height,
+                width=camera.depth_width,
+                height=camera.depth_height,
                 viewMatrix=self.viz_view_matrix,
                 projectionMatrix=self.viz_proj_matrix,
                 renderer=self.pbclient.ER_BULLET_HARDWARE_OPENGL,
@@ -161,12 +165,12 @@ class PyBUtils:
 
         return
 
-    def setup_bird_view_visualizer(self):
+    def setup_bird_view_visualizer(self, camera: "Camera"):
         self.viz_view_matrix = self.pbclient.computeViewMatrixFromYawPitchRoll(
             cameraTargetPosition=[-0.3, -0.06, 1.3], distance=1.06, yaw=-120.3, pitch=-12.48, roll=0, upAxisIndex=2
         )
         self.viz_proj_matrix = self.pbclient.computeProjectionMatrixFOV(
-            fov=60, aspect=float(self.cam_width / self.cam_height), nearVal=0.1, farVal=100.0
+            fov=60, aspect=float(camera.depth_width / camera.depth_height), nearVal=0.1, farVal=100.0
         )
         return
 
@@ -188,11 +192,11 @@ class PyBUtils:
             depth_linearized = None
         return depth_linearized
 
-    def get_rgbd_at_cur_pose(self, type, view_matrix) -> Tuple[NDArray, NDArray]:
+    def get_rgbd_at_cur_pose(self, camera, type, view_matrix) -> Tuple[NDArray, NDArray]:
         """Get RGBD image at current pose"""
         # cur_p = self.ur5.get_current_pose(self.camera_link_index)
-        rgbd = self.get_image_at_curr_pose(type, view_matrix)
-        rgb, depth = self.seperate_rgbd_rgb_d(rgbd, height=self.cam_height, width=self.cam_width)
+        rgbd = self.get_image_at_curr_pose(camera, type, view_matrix)
+        rgb, depth = self.seperate_rgbd_rgb_d(rgbd, height=camera.depth_height, width=camera.depth_width)
         depth = depth.astype(np.float32)
         depth = self.linearize_depth(depth, self.far_val, self.near_val)
         return rgb, depth

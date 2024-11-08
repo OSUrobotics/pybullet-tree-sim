@@ -3,6 +3,7 @@ import os
 import yaml
 import numpy as np
 
+
 def construct_angle_radians(loader, node):
     """Utility function to construct radian values from yaml."""
     value = loader.construct_scalar(node)
@@ -11,10 +12,12 @@ def construct_angle_radians(loader, node):
     except SyntaxError:
         raise Exception("invalid expression: %s" % value)
     return
-        
+
+
 def construct_angle_degrees(loader, node):
     """Utility function for converting degrees into radians from yaml."""
     return np.radians(construct_angle_radians(loader, node))
+
 
 def load_yaml(file_path) -> dict | None:
     try:

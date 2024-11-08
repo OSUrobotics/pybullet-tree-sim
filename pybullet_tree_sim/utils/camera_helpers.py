@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 from __future__ import annotations
+from pybullet_tree_sim.utils.pyb_utils import PyBUtils
 from nptyping import NDArray, Shape, Float
 from typing import Union
 import numpy as np
@@ -14,7 +15,7 @@ def get_dfov_from_fov(fov: tuple):
     return
 
 
-def get_fov_from_dfov(camera_width: int, camera_height: int, dFoV: Union[int, float], degrees: bool=True):
+def get_fov_from_dfov(camera_width: int, camera_height: int, dFoV: Union[int, float], degrees: bool = True):
     """
     Returns the vertical and horizontal field of view (FoV) in degrees given the diagonal field of view (dFoV) in degrees.
     https://www.litchiutilities.com/docs/fov.php
@@ -38,6 +39,10 @@ def get_fov_from_dfov(camera_width: int, camera_height: int, dFoV: Union[int, fl
     fov_w = 2 * np.arctan(np.tan(_dfov / 2) * camera_width / camera_diag)
     return (np.rad2deg(fov_w), np.rad2deg(fov_h))
 
+# def get_pyb_proj_mat(vfov: float, aspect: float, nearVal: float, farVal: float):
+#     return pbutils.pbclient.computeProjectionMatrixFOV(
+#         fov=vfov, aspect=(self.depth_width / self.depth_height), nearVal=near_val, farVal=far_val
+#     )
 
 if __name__ == "__main__":
     camera_width = 64

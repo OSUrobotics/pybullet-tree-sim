@@ -1,8 +1,8 @@
-vl6180:
-    name: "VL6180"
-    data_type: "d"
+name: "VL6180"
+data_type: "d"
+depth:
     dfov: 25.0
     near_plane: 0.002
-    far_plane: 3.4
-    rows: 1
-    columns: 1
+    far_plane: 0.150
+    width: 1
+    height: 1

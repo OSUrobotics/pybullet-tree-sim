@@ -20,7 +20,7 @@ import pywavefront
 from nptyping import NDArray, Shape, Float
 from pybullet_tree_sim import RGB_LABEL, URDF_PATH, MESHES_PATH, PKL_PATH
 from pybullet_tree_sim.utils.pyb_utils import PyBUtils
-from pybullet_tree_sim.utils.helpers import compute_perpendicular_projection_vector
+from pybullet_tree_sim.utils.camera_helpers import compute_perpendicular_projection_vector
 import pybullet_tree_sim.utils.xacro_utils as xutils
 from scipy.spatial.transform import Rotation
 import xacro
@@ -52,7 +52,7 @@ class Tree:
     """
 
     _tree_xacro_path = os.path.join(URDF_PATH, "trees", "envy", "tree.urdf.xacro")
-    _tree_saved_urdf_path = os.path.join(URDF_PATH, "trees", "envy", "generated")
+    _tree_generated_urdf_path = os.path.join(URDF_PATH, "trees", "envy", "generated")
     _tree_meshes_unlabeled_path = os.path.join(MESHES_PATH, "trees", "envy", "unlabeled", "obj")
     _tree_meshes_labeled_path = os.path.join(MESHES_PATH, "trees", "envy", "labeled", "obj")
     _pkl_path = PKL_PATH
@@ -430,7 +430,7 @@ class Tree:
         position: str = "0.0 0.0 0.0",
         orientation: str = "0.0 0.0 0.0",
         save_urdf: bool = True,
-        regenerate_urdf: bool = False, # TODO: make save/regenerate work well together. Will need to add delete URDF function
+        regenerate_urdf: bool = False,  # TODO: make save/regenerate work well together. Will need to add delete URDF function
     ) -> tuple[str, str]:
         """Load a tree URDF from a given path or generate a tree URDF from a xacro file. Returns the URDF content.
         If `tree_urdf_path` is not None, then load that URDF.
@@ -444,9 +444,13 @@ class Tree:
                 raise TreeException(
                     "If parameter 'tree_urdf_path' is not provided, namespace, type, and id must be provided."
                 )
-            urdf_path = os.path.join(Tree._tree_saved_urdf_path, f"{namespace}{tree_type}_tree{tree_id}.urdf")
+            urdf_path = os.path.join(Tree._tree_generated_urdf_path, f"{namespace}{tree_type}_tree{tree_id}.urdf")
             if not os.path.exists(urdf_path):
                 log.info(f"Could not find file '{urdf_path}'. Generating URDF from xacro.")
+                
+                if not os.path.isdir(Tree._tree_generated_urdf_path):
+                    os.mkdir(Tree._tree_generated_urdf_path)
+                
                 urdf_mappings = {
                     "namespace": namespace,
                     "tree_id": str(tree_id),
@@ -456,7 +460,9 @@ class Tree:
                     "rpy": orientation,
                 }
                 # If the tree macro information doesn't describe a generated file, generate it using the generic tree xacro.
-                urdf_content = xutils.load_urdf_from_xacro(xacro_path=Tree._tree_xacro_path, mappings=urdf_mappings).toprettyxml()
+                urdf_content = xutils.load_urdf_from_xacro(
+                    xacro_path=Tree._tree_xacro_path, mappings=urdf_mappings
+                ).toprettyxml()
                 xutils.save_urdf(urdf_content=urdf_content, urdf_path=urdf_path)
                 log.info(f"Saved URDF to file '{urdf_path}'.")
             else:
