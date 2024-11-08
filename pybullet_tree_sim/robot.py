@@ -1,13 +1,6 @@
-import os
-import sys
 from typing import Optional, Tuple
-
-from numpy import ndarray
 import numpy as np
 import pybullet
-from typing import Optional
-
-from nptyping import NDArray, Shape, Float
 from collections import namedtuple
 
 class Robot:
