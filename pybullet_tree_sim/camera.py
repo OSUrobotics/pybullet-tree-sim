@@ -22,7 +22,6 @@ class Camera(Sensor):
         super().__init__(sensor_name, sensor_type)
         self.pan = 0
         self.tilt = 0
-        self.tf_frame: str = ''
 
         # Only dealing with depth data for now, TODO: add RGB data
         self.depth_width = self.params["depth"]["width"]

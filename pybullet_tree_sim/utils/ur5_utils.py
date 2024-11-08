@@ -435,12 +435,13 @@ class UR5:
         return tf
 
     # TODO: Better types for getCameraImage
-    def get_view_mat_at_curr_pose(self, pan, tilt, xyz_offset) -> np.ndarray:
+    def get_view_mat_at_curr_pose(self, sensor, xyz_offset) -> np.ndarray:
         """Get view matrix at current pose"""
-        pose, orientation = self.get_current_pose(self.tool0_link_index)
+        pose, orientation = self.get_current_pose(sensor.tf_frame_index)
+        # pose, orientation = self.get_current_pose(self.tool0_link_index)
         # log.debug(f"tool0 Pose: {pose}, Orientation: {Rotation.from_quat(orientation).as_euler('xyz')}")
 
-        camera_tf = self.create_camera_transform(pose, orientation, pan, tilt, xyz_offset)
+        camera_tf = self.create_camera_transform(pose, orientation, pan=sensor.pan, tilt=sensor.tilt, xyz_offset=sensor.xyz_offset)
 
         # Initial vectors
         camera_vector = np.array([0, 0, 1]) @ camera_tf[:3, :3].T  #
