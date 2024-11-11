@@ -21,8 +21,8 @@ def main():
     penv = PruningEnv(
         pbutils=pbutils, load_robot=True, robot_pos=[0, 1, 0], verbose=True, cam_width=cam_width, cam_height=cam_height
     )
-    
-    penv.activate_shape(shape="cylinder", radius=2*0.0254, height=2.0, orientation=[0,np.pi/2,0])
+
+    penv.activate_shape(shape="cylinder", radius=2 * 0.0254, height=2.0, orientation=[0, np.pi / 2, 0])
     # penv.load_tree(
     #     pbutils=pbutils,
     #     scale=1.0,
@@ -39,15 +39,15 @@ def main():
     for i in range(100):
         pbutils.pbclient.stepSimulation()
         time.sleep(0.1)
-        
+
     # Simulation loop
     while True:
         try:
-            view_matrix = penv.ur5.get_view_mat_at_curr_pose(0,0,[0,0,0])
-            rgbd = penv.pbutils.get_rgbd_at_cur_pose(type='robot', view_matrix=view_matrix)
+            view_matrix = penv.ur5.get_view_mat_at_curr_pose(0, 0, [0, 0, 0])
+            rgbd = penv.pbutils.get_rgbd_at_cur_pose(type="robot", view_matrix=view_matrix)
             keys_pressed = penv.get_key_pressed()
             action = penv.get_key_action(keys_pressed=keys_pressed)
-            action = action.reshape((6,1))
+            action = action.reshape((6, 1))
             jv, jacobian = penv.ur5.calculate_joint_velocities_from_ee_velocity_dls(end_effector_velocity=action)
             penv.ur5.action = jv
             singularity = penv.ur5.set_joint_velocities(penv.ur5.action)
@@ -63,4 +63,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-  

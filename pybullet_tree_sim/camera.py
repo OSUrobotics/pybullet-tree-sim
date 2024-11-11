@@ -22,12 +22,12 @@ class Camera(Sensor):
         super().__init__(sensor_name, sensor_type)
         self.pan = 0
         self.tilt = 0
-        self.tf_frame: str = ''
+        self.tf_frame: str = ""
 
         # Only dealing with depth data for now, TODO: add RGB data
         self.depth_width = self.params["depth"]["width"]
         self.depth_height = self.params["depth"]["height"]
-        
+
         # Some optical sensors only provide diagonal field of view, get horizontal and vertical from diagonal
         try:
             vfov = self.params["depth"]["vfov"]
@@ -37,9 +37,11 @@ class Camera(Sensor):
         far_val = self.params["depth"]["far_plane"]
 
         self.depth_pixel_coords = np.array(list(np.ndindex((self.depth_width, self.depth_height))), dtype=int)
-        self.depth_film_coords = 2 * (
-            self.depth_pixel_coords + np.array([0.5, 0.5]) - np.array([self.depth_width / 2, self.depth_height / 2])
-        ) / np.array([self.depth_width, self.depth_height])
+        self.depth_film_coords = (
+            2
+            * (self.depth_pixel_coords + np.array([0.5, 0.5]) - np.array([self.depth_width / 2, self.depth_height / 2]))
+            / np.array([self.depth_width, self.depth_height])
+        )
         self.depth_proj_mat = pbutils.pbclient.computeProjectionMatrixFOV(
             fov=vfov, aspect=(self.depth_width / self.depth_height), nearVal=near_val, farVal=far_val
         )
