@@ -6,7 +6,6 @@ from toolz import partial
 
 
 class TestHelpers(unittest.TestCase):
-
     def test_negative_dfov(self):
         dfov = -65
         cam_w = 100
@@ -15,7 +14,7 @@ class TestHelpers(unittest.TestCase):
         with self.assertRaises(ValueError) as cm:
             helpers.get_fov_from_dfov(cam_w, cam_h, dfov)
         return
-        
+
     def test_negative_cam_width(self):
         dfov = 65
         cam_w = -100
@@ -24,7 +23,7 @@ class TestHelpers(unittest.TestCase):
         with self.assertRaises(ValueError) as cm:
             helpers.get_fov_from_dfov(cam_w, cam_h, dfov)
         return
-        
+
     def test_negative_cam_height(self):
         dfov = 65
         cam_w = 100
@@ -33,10 +32,6 @@ class TestHelpers(unittest.TestCase):
         with self.assertRaises(ValueError) as cm:
             helpers.get_fov_from_dfov(cam_w, cam_h, dfov)
         return
-        
-    
-
-
 
 
 # class TestStringMethods(unittest.TestCase):
@@ -55,5 +50,5 @@ class TestHelpers(unittest.TestCase):
 #         with self.assertRaises(TypeError):
 #             s.split(2)
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

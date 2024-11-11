@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 from __future__ import annotations
+
 """
 Author (s): Abhinav Jain, Luke Strohbehn
 """
@@ -13,6 +14,7 @@ from pybullet_utils import bullet_client as bc
 from scipy.constants import g as grav
 
 from pybullet_tree_sim import MESHES_PATH, URDF_PATH, TEXTURES_PATH
+
 # from pybullet_tree_sim.camera import Camera
 # from pybullet_tree_sim.utils.camera_helpers import get_fov_from_dfov
 
@@ -144,7 +146,7 @@ class PyBUtils:
             if view_matrix is None:
                 raise ValueError("view_matrix cannot be None for robot view")
             return self.pbclient.getCameraImage(
-                width=camera.depth_width, # TODO: make separate function for rgb?
+                width=camera.depth_width,  # TODO: make separate function for rgb?
                 height=camera.depth_height,
                 viewMatrix=view_matrix,
                 projectionMatrix=camera.depth_proj_mat,

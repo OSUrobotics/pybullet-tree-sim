@@ -39,6 +39,7 @@ def get_fov_from_dfov(camera_width: int, camera_height: int, dFoV: Union[int, fl
     fov_w = 2 * np.arctan(np.tan(_dfov / 2) * camera_width / camera_diag)
     return (np.rad2deg(fov_w), np.rad2deg(fov_h))
 
+
 # def get_pyb_proj_mat(vfov: float, aspect: float, nearVal: float, farVal: float):
 #     return pbutils.pbclient.computeProjectionMatrixFOV(
 #         fov=vfov, aspect=(self.depth_width / self.depth_height), nearVal=near_val, farVal=far_val

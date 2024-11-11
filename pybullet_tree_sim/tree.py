@@ -447,10 +447,10 @@ class Tree:
             urdf_path = os.path.join(Tree._tree_generated_urdf_path, f"{namespace}{tree_type}_tree{tree_id}.urdf")
             if not os.path.exists(urdf_path):
                 log.info(f"Could not find file '{urdf_path}'. Generating URDF from xacro.")
-                
+
                 if not os.path.isdir(Tree._tree_generated_urdf_path):
                     os.mkdir(Tree._tree_generated_urdf_path)
-                
+
                 urdf_mappings = {
                     "namespace": namespace,
                     "tree_id": str(tree_id),
