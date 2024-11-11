@@ -3,11 +3,12 @@ import numpy as np
 import pybullet
 from collections import namedtuple
 
+
 class Robot:
     def __init__(
-        self, 
-        con, 
-        robot_type: str, 
+        self,
+        con,
+        robot_type: str,
         robot_urdf_path: str,
         tool_link_name: str,
         end_effector_link_name: str,
@@ -16,10 +17,10 @@ class Robot:
         control_joints,
         robot_collision_filter_idxs,
         init_joint_angles: Optional[list] = None,
-        pos=(0, 0, 0), 
-        orientation=(0, 0, 0, 1), 
-        randomize_pose=False, 
-        verbose=1
+        pos=(0, 0, 0),
+        orientation=(0, 0, 0, 1),
+        randomize_pose=False,
+        verbose=1,
     ) -> None:
         self.con = con
         self.robot_type = robot_type
@@ -34,14 +35,12 @@ class Robot:
         self.randomize_pose = randomize_pose
 
         self.joint_info = namedtuple(
-            "jointInfo", 
-            ["id", "name", "type", "lowerLimit", "upperLimit", "maxForce", "maxVelocity", "controllable"]
+            "jointInfo", ["id", "name", "type", "lowerLimit", "upperLimit", "maxForce", "maxVelocity", "controllable"]
         )
         # Pruning camera information
-        self.camera_base_offset = np.array(
-            [0.063179, 0.077119, 0.0420027])
+        self.camera_base_offset = np.array([0.063179, 0.077119, 0.0420027])
         self.verbose = verbose
-        
+
         self.joints = None
         self.robot = None
         self.control_joints = control_joints
@@ -58,25 +57,16 @@ class Robot:
             delta_pos = np.random.rand(3) * 0.0
             delta_orientation = pybullet.getQuaternionFromEuler(np.random.rand(3) * np.pi / 180 * 5)
         else:
-            delta_pos = np.array([0., 0., 0.])
+            delta_pos = np.array([0.0, 0.0, 0.0])
             delta_orientation = pybullet.getQuaternionFromEuler([0, 0, 0])
 
         self.pos, self.orientation = self.con.multiplyTransforms(
-            self.pos, 
-            self.orientation, 
-            delta_pos, 
-            delta_orientation
+            self.pos, self.orientation, delta_pos, delta_orientation
         )
-        self.robot = self.con.loadURDF(
-            self.robot_urdf_path, 
-            self.pos, 
-            self.orientation, 
-            flags=flags, 
-            useFixedBase=True
-        )
+        self.robot = self.con.loadURDF(self.robot_urdf_path, self.pos, self.orientation, flags=flags, useFixedBase=True)
         self.num_joints = self.con.getNumJoints(self.robot)
 
-        #Get indices dynamically
+        # Get indices dynamically
         self.tool0_link_index = self.get_link_index(self.tool_link_name)
         self.end_effector_index = self.get_link_index(self.end_effector_link_name)
         self.success_link_index = self.get_link_index(self.success_link_name)
@@ -84,7 +74,7 @@ class Robot:
 
         self.set_collision_filter()
 
-        #Setup robot info only once
+        # Setup robot info only once
         if not self.joints:
             self.joints = dict()
             self.controllable_joints_idxs = []
@@ -118,14 +108,14 @@ class Robot:
                         print("Controllable Joint Name: ", jointName, "Joint ID: ", jointID)
 
                 info = self.joint_info(
-                    jointID, 
-                    jointName, 
-                    jointType, 
-                    jointLowerLimit, 
-                    jointUpperLimit, 
+                    jointID,
+                    jointName,
+                    jointType,
+                    jointLowerLimit,
+                    jointUpperLimit,
                     jointMaxForce,
-                    jointMaxVelocity, 
-                    controllable
+                    jointMaxVelocity,
+                    controllable,
                 )
 
                 if info.type == self.con.JOINT_REVOLUTE:
@@ -153,15 +143,15 @@ class Robot:
         num_joints = self.con.getNumJoints(self.robot)
         for i in range(num_joints):
             info = self.con.getJointInfo(self.robot, i)
-            child_link_name = info[12].decode('utf-8')
+            child_link_name = info[12].decode("utf-8")
             if child_link_name == link_name:
-                return i # return link index
-        
-        base_link_name = self.con.getBodyInfo(self.robot)[0].decode('utf-8')
+                return i  # return link index
+
+        base_link_name = self.con.getBodyInfo(self.robot)[0].decode("utf-8")
         if base_link_name == link_name:
-            return -1 #base link has index of -1
+            return -1  # base link has index of -1
         raise ValueError(f"Link '{link_name}' not found in the robot URDF.")
-    
+
     def reset_robot(self):
         if self.robot is None:
             return
@@ -193,12 +183,13 @@ class Robot:
             forces.append(joint.maxForce)
 
         self.con.setJointMotorControlArray(
-            self.robot, indexes,
+            self.robot,
+            indexes,
             self.con.POSITION_CONTROL,
             targetPositions=joint_angles,
             targetVelocities=[0] * len(poses),
             positionGains=[0.05] * len(poses),
-            forces=forces
+            forces=forces,
         )
 
     def set_joint_velocities(self, joint_velocities) -> None:
@@ -214,11 +205,12 @@ class Robot:
             indexes.append(joint.id)
             forces.append(joint.maxForce)
 
-        self.con.setJointMotorControlArray(self.robot,
-                                           indexes,
-                                           controlMode=self.con.VELOCITY_CONTROL,
-                                           targetVelocities=joint_velocities,
-                                           )
+        self.con.setJointMotorControlArray(
+            self.robot,
+            indexes,
+            controlMode=self.con.VELOCITY_CONTROL,
+            targetVelocities=joint_velocities,
+        )
 
     # TODO: Use proprty decorator for getters?
     def get_joint_velocities(self):
@@ -241,8 +233,7 @@ class Robot:
 
     def get_current_vel(self, index):
         """Returns current pose of the index."""
-        link_state = self.con.getLinkState(self.robot, index, computeLinkVelocity=True,
-                                           computeForwardKinematics=True)
+        link_state = self.con.getLinkState(self.robot, index, computeLinkVelocity=True, computeForwardKinematics=True)
         trans, ang = link_state[6], link_state[7]
         return trans, ang
 
@@ -256,16 +247,26 @@ class Robot:
         """Calculates joint angles from end effector position and orientation using inverse kinematics"""
 
         joint_angles = self.con.calculateInverseKinematics(
-            self.robot, self.end_effector_index, position, orientation,
-            jointDamping=[0.01] * len(self.control_joints), upperLimits=self.joint_upper_limits,
-            lowerLimits=self.joint_lower_limits, jointRanges=self.joint_ranges  # , restPoses=self.init_joint_angles
+            self.robot,
+            self.end_effector_index,
+            position,
+            orientation,
+            jointDamping=[0.01] * len(self.control_joints),
+            upperLimits=self.joint_upper_limits,
+            lowerLimits=self.joint_lower_limits,
+            jointRanges=self.joint_ranges,  # , restPoses=self.init_joint_angles
         )
         return joint_angles
 
     def calculate_jacobian(self):
-        jacobian = self.con.calculateJacobian(self.robot, self.tool0_link_index, [0, 0, 0],
-                                              self.get_joint_angles(),
-                                              [0]*len(self.control_joints), [0]*len(self.control_joints))
+        jacobian = self.con.calculateJacobian(
+            self.robot,
+            self.tool0_link_index,
+            [0, 0, 0],
+            self.get_joint_angles(),
+            [0] * len(self.control_joints),
+            [0] * len(self.control_joints),
+        )
         jacobian = np.vstack(jacobian)
         return jacobian
 
@@ -276,9 +277,7 @@ class Robot:
         joint_velocities = np.matmul(inv_jacobian, end_effector_velocity).astype(np.float32)
         return joint_velocities, jacobian
 
-    def calculate_joint_velocities_from_ee_velocity_dls(self,
-                                                        end_effector_velocity,
-                                                        damping_factor: float = 0.05):
+    def calculate_joint_velocities_from_ee_velocity_dls(self, end_effector_velocity, damping_factor: float = 0.05):
         """Calculate joint velocities from end effector velocity using damped least squares"""
         jacobian = self.calculate_jacobian()
         identity_matrix = np.eye(jacobian.shape[0])
@@ -343,6 +342,7 @@ class Robot:
         """Enable collision between pruner and arm"""
         for i in self.robot_collision_filter_idxs:
             self.con.setCollisionFilterPair(self.robot, self.robot, i[0], i[1], 1)
+
     def disable_self_collision(self):
         for i in range(self.num_joints):
             for j in range(self.num_joints):
@@ -361,8 +361,8 @@ class Robot:
         """
         collision_info = {"collisions_acceptable": False, "collisions_unacceptable": False}
 
-        collision_acceptable_list = ['SPUR', 'WATER_BRANCH']
-        collision_unacceptable_list = ['TRUNK', 'BRANCH', 'SUPPORT']
+        collision_acceptable_list = ["SPUR", "WATER_BRANCH"]
+        collision_unacceptable_list = ["TRUNK", "BRANCH", "SUPPORT"]
         for type in collision_acceptable_list:
             collisions_acceptable = self.con.getContactPoints(bodyA=self.robot, bodyB=collision_objects[type])
             if collisions_acceptable:
@@ -401,8 +401,9 @@ class Robot:
         """Check if there are any collisions between the robot and the environment
         Returns: Boolw
         """
-        collisions_success = self.con.getContactPoints(bodyA=self.robot, bodyB=body_b,
-                                                       linkIndexA=self.success_link_index)
+        collisions_success = self.con.getContactPoints(
+            bodyA=self.robot, bodyB=body_b, linkIndexA=self.success_link_index
+        )
         for i in range(len(collisions_success)):
             if collisions_success[i][-6] < 0.05:
                 if self.verbose > 1:
