@@ -1,10 +1,12 @@
 <?xml version ="1.0"?>
-<robot xmlns:xacro="http://wiki.ros.org/xacro">
+<robot xmlns:xacro="http://wiki.ros.org/xacro" name="pruning_robot">
     <!-- robot name parameter -->
-    <xacro:arg name="name" default="robot_pybullet_tree_sim"/>
-    <xacro:property name="arm_base_parent" value="world" />
-    <xacro:property name="end_effector_parent" value="" />
+    <xacro:arg name="name" default="pruning_robot"/>
+    <!-- <xacro:arg name="robot_parent" default="world" /> -->
 
+    <xacro:property name="base_attachment_parent" value="world"/>
+    <xacro:property name="robot_arm_parent" value="world"/>
+    <xacro:property name="end_effector_parent" value="world"/>
     
     <!-- create link fixed to the "world" -->
     <link name="world" />
@@ -17,20 +19,20 @@
         <!-- linear slider -->
         <xacro:include filename="$(find linear_slider_description)/urdf/macro/linear_slider_base.urdf.xacro" />
     
-        <xacro:arg name="linear_slider_parent" default="world"/>
+        <xacro:arg name="linear_slider_parent" default="${base_attachment_parent}"/>
         <xacro:arg name="linear_slider_robot_ip" default="169.254.57.177"/> <!-- TODO: add this into the macro, but instead get from yaml file-->
-        <xacro:arg name="prefix" default="''" />
+        <xacro:arg name="base_prefix" default="linear_slider__" />
         <xacro:arg name="use_mock_hardware" default="false" />
         <xacro:arg name="mock_sensor_commands" default="false" />
         <xacro:arg name="sim_gazebo" default="false" />
         <xacro:arg name="sim_gazebo_classic" default="false"/>
         
         <!-- Set slider moving base as arm parent joint -->
-        <xacro:property name="arm_base_parent" value="$(arg prefix)tool0" />
+        <xacro:property name="robot_arm_parent" value="$(arg base_prefix)tool0" />
             
         <xacro:linear_slider
             parent="$(arg linear_slider_parent)"
-            prefix="$(arg prefix)"
+            prefix="$(arg base_prefix)"
             sim_gazebo="$(arg sim_gazebo)"
             sim_gazebo_classic="$(arg sim_gazebo_classic)"
             use_mock_hardware="$(arg use_mock_hardware)"
@@ -42,16 +44,17 @@
     </xacro:if>
 
     <!-- Robot arm type. Current types are UR and Franka Emika -->
-    <xacro:arg name="robot_type" default="robot_type" />
-    <xacro:if value="${ '$(arg robot_type)' == 'ur5' }">
+    <xacro:arg name="arm_type" default="arm_type" />
+    <xacro:if value="${ '$(arg arm_type)' == 'ur5' }">
         <xacro:include filename="$(find ur_description)/urdf/ur_macro.xacro"/>
         <!-- UR -->
         <!-- possible 'ur_type' values: ur3, ur3e, ur5, ur5e, ur10, ur10e, ur16e, ur20, ur30 -->
         <!-- the default value should raise an error in case this was called without defining the type -->
         <xacro:arg name="ur_type" default="ur5x"/>
+        <xacro:arg name="ur_parent" default="${robot_arm_parent}"/>
         
         <!-- parameters -->
-        <xacro:arg name="tf_prefix" default="" />
+        <xacro:arg name="tf_prefix" default="ur5__" />
         <xacro:arg name="joint_limit_params" default="$(find ur_description)/config/$(arg ur_type)/joint_limits.yaml"/>
         <xacro:arg name="kinematics_params" default="$(find ur_description)/config/$(arg ur_type)/default_kinematics.yaml"/>
         <xacro:arg name="physical_params" default="$(find ur_description)/config/$(arg ur_type)/physical_parameters.yaml"/>
@@ -99,7 +102,7 @@
         <xacro:ur_robot
             name="$(arg name)"
             tf_prefix="$(arg tf_prefix)"
-            parent="world"
+            parent="$(arg ur_parent)"
             joint_limits_parameters_file="$(arg joint_limit_params)"
             kinematics_parameters_file="$(arg kinematics_params)"
             physical_parameters_file="$(arg physical_params)"
@@ -135,8 +138,13 @@
             >
             <origin xyz="0 0 0" rpy="0 0 0" />          <!-- position robot in the world -->
         </xacro:ur_robot>
+        
+        <!-- Update end-effector parent -->
+        <xacro:property name="end_effector_parent" value="$(arg tf_prefix)tool0"/>
+
+        
     </xacro:if>
-    <xacro:if value="${ '$(arg robot_type)' == 'fr3' }">
+    <xacro:if value="${ '$(arg arm_type)' == 'fr3' }">
         <xacro:include filename="$(find franka_description)/robots/common/franka_robot.xacro"/>
         <!-- Name for this robot -->
         <xacro:arg name="arm_id" default="fr3" />
@@ -173,6 +181,9 @@
                             fake_sensor_commands="$(arg fake_sensor_commands)"
                             gazebo_effort="$(arg gazebo_effort)">
         </xacro:franka_robot>
+        
+        <!-- <xacro:property name="end_effector_parent" value="$(arg fr3_prefix)tool0"/> -->
+        
     </xacro:if>
     
     <!-- Robot arm base/eef attachments -->
@@ -180,7 +191,21 @@
     <xacro:if value="${ '$(arg end_effector_type)' == 'apple_picker' }">
         
     </xacro:if>
-    <xacro:if value="${ '$(arg end_effector_type)' == 'pruner' }" >
+    <xacro:if value="${ '$(arg end_effector_type)' == 'mock_pruner' }" >
+        <xacro:include filename="../../end_effectors/mock_pruner/macro/mock_pruner_macro.urdf.xacro"/>
+        
+        <!-- Args -->
+        <xacro:arg name="eef_parent" default="${end_effector_parent}" />
+        <xacro:arg name="eef_prefix" default="mock_pruner__" />
+        
+        <xacro:mock_pruner_macro
+            eef_prefix="$(arg eef_prefix)"
+            eef_parent="$(arg eef_parent)"
+            tof0_offset='0.02'
+            tof1_offset='-0.02'
+            camera_offset='' 
+        />
+        
         
     </xacro:if>
     
