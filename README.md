@@ -1,3 +1,6 @@
+urdf generic launch CLI test:
+`xacro robot.urdf.xacro > test.urdf end_effector_type:=mock_pruner eef_parent:=ur5e__tool0 arm_type:=ur5 ur_type:=ur5e tf_prefix:=ur5e__ base_attachment_type:=linear_slider`
+
 ## TODO
 1. For Claire: 
     1. Generic URDF to Generic Robot class

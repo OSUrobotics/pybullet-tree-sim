@@ -398,7 +398,9 @@ class PruningEnv(gym.Env):
 
         plot = False
         if plot:
-            self.debug_plots(camera=camera, data=data, cam_coords=cam_coords, world_coords=world_coords, view_matrix=view_matrix)
+            self.debug_plots(
+                camera=camera, data=data, cam_coords=cam_coords, world_coords=world_coords, view_matrix=view_matrix
+            )
 
         return world_coords
 
@@ -561,7 +563,6 @@ class PruningEnv(gym.Env):
             action = np.array([0.0, 0.0, 0, 0.0, 0.0, 0.0])
             keys_pressed = []
         return action
-
 
     def run_sim(self) -> int:
 
