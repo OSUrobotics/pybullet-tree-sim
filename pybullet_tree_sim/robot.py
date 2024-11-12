@@ -1,3 +1,7 @@
+#!/usr/bin/env python3
+from pybullet_tree_sim.utils.pyb_utils import PyBUtils
+import pybullet_tree_sim.utils.xacro_utils as xutils
+
 from typing import Optional, Tuple
 import numpy as np
 import pybullet
@@ -7,7 +11,7 @@ from collections import namedtuple
 class Robot:
     def __init__(
         self,
-        con,
+        pbclient,
         robot_type: str,
         robot_urdf_path: str,
         tool_link_name: str,
@@ -46,6 +50,7 @@ class Robot:
         self.control_joints = control_joints
         self.robot_collision_filter_idxs = robot_collision_filter_idxs
         self.setup_robot()
+        return
 
     def setup_robot(self):
         if self.robot is not None:
@@ -421,3 +426,24 @@ class Robot:
         for i in collision_objects.values():
             for j in range(self.num_joints):
                 self.con.setCollisionFilterPair(self.robot, i, j, 0, 1)
+
+
+def main():
+    from pybullet_tree_sim.utils.pyb_utils import PyBUtils
+    pbutils = PyBUtils(renders=True)
+    
+    robot = Robot(
+        pbclient=pbutils.pbclient,
+        robot_type='ur5e',
+        robot_urdf_path="",
+        tool_link_name="mock_pruner__tool0",
+        base_link_name="linear_slider__base_link",
+        
+    )
+
+    print(robot)
+
+    return
+
+if __name__ == "__main__":
+    main()

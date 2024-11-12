@@ -582,6 +582,7 @@ def main():
     # data = data.reshape((cam_width * cam_height, 1), order="F")
 
     # log.warning(f"joint angles: {penv.ur5.get_joint_angles()}")
+    
     return
 
 
