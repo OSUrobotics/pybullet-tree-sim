@@ -1,0 +1,5 @@
+arm_type: ur5e
+# arm_parent: tool0
+arm_prefix: ur5e__
+tf_prefix: ur5e__
+ur_type: ur5e
