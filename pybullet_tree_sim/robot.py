@@ -27,13 +27,13 @@ class Robot:
         # success_link_name: str,
         # base_link_name: str,
         # control_joints,
-        robot_collision_filter_idxs,
+        # robot_collision_filter_idxs,
         # init_joint_angles: Optional[list] = None,
         position=(0, 0, 0),
         orientation=(0, 0, 0, 1),
         randomize_pose=False,
-        # verbose=1
-        **kwargs
+        verbose=1
+        # **kwargs
     ) -> None:
         self.pbclient = pbclient
         # self.robot_type = robot_type
@@ -54,47 +54,36 @@ class Robot:
         # # Pruning camera information
         # self.camera_base_offset = np.array(
         #     [0.063179, 0.077119, 0.0420027])
-        # self.verbose = verbose
+        self.verbose = verbose
 
-        # self.joints = None
+        self.joints = None
         self.robot = None
         # self.control_joints = control_joints
         # self.robot_collision_filter_idxs = robot_collision_filter_idxs
-        #
+        
+        
+        self.robot_conf = {}
         self._generate_robot_urdf()
         self.setup_robot()
 
         return
 
-    def _generate_robot_urdf(self):
-        # TODO: move this stuff to yaml file
-        # base_parent = f"world",
-        # base_prefix = f"linear_slider__",
-        # arm_parent =  f"{base_prefix}tool0"
-        # arm_prefix =  f"ur5__",
-        # eef_parent =  f"{arm_prefix}tool0"
-        # eef_prefix =  f"mock_pruner__",
-
-        robot_conf = {}
-
-        # Get robot stack params
-        robot_stack: list = yutils.load_yaml(os.path.join(self._robot_configs_path, "robot.yaml"))["robot_stack"]
-        # Add the required urdf args from yaml configs
-        log.warn(robot_stack)
-        for robot_part in robot_stack:
+    def _generate_robot_urdf(self) -> None:
+        # Get robot params
+        self.robot_conf.update(yutils.load_yaml(os.path.join(self._robot_configs_path, "robot.yaml")))
+        # Add the required urdf args from each element of the robot_stack config
+        for robot_part in self.robot_conf["robot_stack"]:
             robot_part = robot_part.strip().lower()
-            # print(os.path.join(self._robot_configs_path, f"{robot_part}.yaml"))
-            robot_conf.update(yutils.load_yaml(os.path.join(self._robot_configs_path, f"{robot_part}.yaml")))
-
-        log.warn(robot_conf)
+            self.robot_conf.update(yutils.load_yaml(os.path.join(self._robot_configs_path, f"{robot_part}.yaml")))
+        
         # Generate URDF from mappings
         robot_urdf = xutils.load_urdf_from_xacro(
             xacro_path=self._robot_xacro_path,
-            mappings=robot_conf
+            mappings=self.robot_conf # for some reason, this adds in the rest of the args from the xacro.
         )
 
-        # UR_description uses filename="package://<>", and this doesn't work with pybullet
-        if robot_conf['arm_type'].startswith('ur'):
+        # UR_description uses filename="package://<>" for meshes, and this doesn't work with pybullet
+        if self.robot_conf['arm_type'].startswith('ur'):
             ur_absolute_mesh_path = '/opt/ros/humble/share/ur_description/meshes'
             robot_urdf = robot_urdf.toprettyxml().replace(
                 f'filename="package://ur_description/meshes',
@@ -102,12 +91,10 @@ class Robot:
             )
         else:
             robot_urdf = robot_urdf.toprettyxml()
+            
         # Save the generated URDF
         self.robot_urdf_path = os.path.join(self._urdf_tmp_path, "robot.urdf")
         xutils.save_urdf(robot_urdf, urdf_path=self.robot_urdf_path)
-
-        # log.warn(modified_urdf)
-
         return
 
     def setup_robot(self):
@@ -137,16 +124,14 @@ class Robot:
             useFixedBase=True
         )
         self.num_joints = self.pbclient.getNumJoints(self.robot)
-
-        #Get indices dynamically
-        # self.tool0_link_index = self.get_link_index(self.tool_link_name)
-        # TODO: Get tool0 from the last element in the robot stack
-        self.tool0_link_index = self.get_link_index("mock_pruner__tool0")
-        # self.end_effector_index = self.get_link_index(self.end_effector_link_name)
-        # self.success_link_index = self.get_link_index(self.success_link_name)
-        self.base_index = self.get_link_index("ur5e__base_link")
-
+        
+        # get link indices dynamically
+        self._assign_link_indices()
+        
         self.set_collision_filter()
+        
+        import pprint as pp
+        pp.pprint(self.robot_conf)
 
         #Setup robot info only once
         if not self.joints:
@@ -205,31 +190,47 @@ class Robot:
         self.set_joint_angles_no_collision(self.init_joint_angles)
         self.pbclient.stepSimulation()
 
-        self.init_pos_ee = self.get_current_pose(self.end_effector_index)
-        self.init_pos_base = self.get_current_pose(self.base_index)
-        self.init_pos_eebase = self.get_current_pose(self.success_link_index)
-        self.action = np.zeros(len(self.init_joint_angles), dtype=np.float32)
+        # self.init_pos_ee = self.get_current_pose(self.end_effector_index)
+        # self.init_pos_base = self.get_current_pose(self.base_index)
+        # self.init_pos_eebase = self.get_current_pose(self.success_link_index)
+        # self.action = np.zeros(len(self.init_joint_angles), dtype=np.float32)
         self.joint_angles = np.array(self.init_joint_angles).astype(np.float32)
-        self.achieved_pos = np.array(self.get_current_pose(self.end_effector_index)[0])
-        base_pos, base_or = self.get_current_pose(self.base_index)
+        # self.achieved_pos = np.array(self.get_current_pose(self.end_effector_index)[0])
+        # base_pos, base_or = self.get_current_pose(self.base_index)
         return
 
-    def get_link_index(self, link_name):
+    # def get_link_index(self, link_name):
+    #     num_joints = self.pbclient.getNumJoints(self.robot)
+    #     for i in range(num_joints):
+    #         info = self.pbclient.getJointInfo(self.robot, i)
+    #         child_link_name = info[12].decode('utf-8')
+    #         log.warn(child_link_name)
+    #         self.robot_conf["tf_frames"].update({child_link_name: i})
+
+    #         if child_link_name == link_name:
+    #             return i # return link index
+
+    #     base_link_name = self.pbclient.getBodyInfo(self.robot)[0].decode('utf-8')
+    #     if base_link_name == link_name:
+    #         return -1 #base link has index of -1
+    #     raise ValueError(f"Link '{link_name}' not found in the robot URDF.")
+    
+    def _assign_link_indices(self):
+        self.robot_collision_filter_idxs = []
         num_joints = self.pbclient.getNumJoints(self.robot)
+        self.robot_conf["joint_info"] = {}
+        prev_link_parent = 'world'
         for i in range(num_joints):
             info = self.pbclient.getJointInfo(self.robot, i)
             child_link_name = info[12].decode('utf-8')
-            log.warn(child_link_name)
-
-            if child_link_name == link_name:
-                return i # return link index
-
-        base_link_name = self.pbclient.getBodyInfo(self.robot)[0].decode('utf-8')
-        if base_link_name == link_name:
-            return -1 #base link has index of -1
-        raise ValueError(f"Link '{link_name}' not found in the robot URDF.")
+            
+            # This is kinda hacky, but it works for now. TODO: make better?
+            if child_link_name.endswith('base'):
+                self.robot_collision_filter_idxs.append((i, i-1))
+            self.robot_conf["joint_info"].update({child_link_name: i})
+        log.warn(self.robot_collision_filter_idxs)
+        return
         
-
     def reset_robot(self):
         if self.robot is None:
             return
@@ -410,22 +411,27 @@ class Robot:
         """Disable collision between pruner and arm"""
         for i in self.robot_collision_filter_idxs:
             self.pbclient.setCollisionFilterPair(self.robot, self.robot, i[0], i[1], 0)
-
+        return
+        
     def unset_collision_filter(self):
         """Enable collision between pruner and arm"""
         for i in self.robot_collision_filter_idxs:
             self.pbclient.setCollisionFilterPair(self.robot, self.robot, i[0], i[1], 1)
+        return
+        
     def disable_self_collision(self):
         for i in range(self.num_joints):
             for j in range(self.num_joints):
                 if i != j:
                     self.pbclient.setCollisionFilterPair(self.robot, self.robot, i, j, 0)
+        return
 
     def enable_self_collision(self):
         for i in range(self.num_joints):
             for j in range(self.num_joints):
                 if i != j:
                     self.pbclient.setCollisionFilterPair(self.robot, self.robot, i, j, 1)
+        return
 
     def check_collisions(self, collision_objects) -> Tuple[bool, dict]:
         """Check if there are any collisions between the robot and the environment
@@ -501,9 +507,9 @@ def main():
 
     robot = Robot(
         pbclient = pbutils.pbclient,
-        robot_type="ur5e",
-        base_link_type="linear_slider",
-        end_effector_type="mock_pruner",
+        # robot_type="ur5e",
+        # base_link_type="linear_slider",
+        # end_effector_type="mock_pruner",
 
     )
 
