@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 from pybullet_tree_sim import CONFIG_PATH, MESHES_PATH, URDF_PATH, RGB_LABEL, ROBOT_URDF_PATH
+from pybullet_tree_sim.robot import Robot
 from pybullet_tree_sim.tree import Tree, TreeException
-from pybullet_tree_sim.utils.ur5_utils import UR5
+# from pybullet_tree_sim.utils.ur5_utils import UR5
 from pybullet_tree_sim.utils.pyb_utils import PyBUtils
 import pybullet_tree_sim.utils.xacro_utils as xutils
 import pybullet_tree_sim.utils.yaml_utils as yutils
@@ -173,14 +174,16 @@ class PruningEnv(gym.Env):
         type = type.strip().lower()
         if type == "ur5":
             log.info("Loading UR5 Robot")
-            robot = UR5(
-                con=self.pbutils.pbclient,
-                robot_urdf_path=ROBOT_URDF_PATH,
-                pos=robot_pos,
-                orientation=robot_orientation,
-                randomize_pose=randomize_pose,
-                verbose=self.verbose,
-            )
+            # robot = UR5(
+            #     con=self.pbutils.pbclient,
+            #     robot_urdf_path=ROBOT_URDF_PATH,
+            #     pos=robot_pos,
+            #     orientation=robot_orientation,
+            #     randomize_pose=randomize_pose,
+            #     verbose=self.verbose,
+            # )
+            robot = Robot()
+            
         else:
             raise NotImplementedError(f"Robot type {type} not implemented")
         return robot

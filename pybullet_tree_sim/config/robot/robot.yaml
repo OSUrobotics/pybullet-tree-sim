@@ -2,11 +2,11 @@ robot_stack:
     # - linear_slider
     - ur5e
     - mock_pruner
-initial_joint_angles:
-    - 0.0
-    - 0.0
-    - 0.0
-    - 0.0
-    - 0.0
-    - 0.0
+# initial_joint_angles:
+#     - 0.0
+#     - 0.0
+#     - 0.0
+#     - 0.0
+#     - 0.0
+#     - 0.0
 disable_self_collisions: true
