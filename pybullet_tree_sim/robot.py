@@ -64,6 +64,7 @@ class Robot:
         
         self.robot_conf = {}
         self._generate_robot_urdf()
+        self._assign_control_joints()
         self.setup_robot()
 
         return
@@ -93,8 +94,24 @@ class Robot:
             robot_urdf = robot_urdf.toprettyxml()
             
         # Save the generated URDF
+        self.robot_urdf: str = robot_urdf
         self.robot_urdf_path = os.path.join(self._urdf_tmp_path, "robot.urdf")
         xutils.save_urdf(robot_urdf, urdf_path=self.robot_urdf_path)
+        return
+        
+    def _assign_control_joints(self) -> None:
+        self.robot_conf['control_joints'] = []
+        with open(self.robot_urdf_path) as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith('<joint') and "type=" in line:
+                    log.warn(line)
+                    joint_name = line.split('name="')[1].split('"')[0]
+                    joint_type = line.split('type="')[1].split('"')[0]
+                    if joint_type == 'fixed':
+                        continue
+                    else:
+                        self.robot_conf['control_joints'].append(joint_name)
         return
 
     def setup_robot(self):
@@ -155,7 +172,7 @@ class Robot:
                 if self.verbose > 1:
                     print("Joint Name: ", jointName, "Joint ID: ", jointID)
 
-                controllable = True if jointName in self.control_joints else False
+                controllable = True if jointName in self.robot_conf["control_joints"] else False
                 if controllable:
                     self.controllable_joints_idxs.append(i)
                     self.joint_lower_limits.append(jointLowerLimit)
