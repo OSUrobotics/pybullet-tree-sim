@@ -1,0 +1,3 @@
+base_type: linear_slider
+base_parent: world
+base_prefix: linear_slider__

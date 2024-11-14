@@ -411,36 +411,36 @@ class UR5:
         trans, ang = link_state[6], link_state[7]
         return trans, ang
 
-    def create_camera_transform(self, pos, orientation, pan, tilt, xyz_offset) -> np.ndarray:
+    def create_camera_transform(self, world_position, world_orientation, camera: "Camera") -> np.ndarray:
         """Create rotation matrix for camera"""
         base_offset_tf = np.identity(4)
-        base_offset_tf[:3, 3] = self.camera_base_offset + xyz_offset
+        base_offset_tf[:3, 3] = camera.xyz_offset
 
         ee_transform = np.identity(4)
-        ee_rot_mat = np.array(self.con.getMatrixFromQuaternion(orientation)).reshape(3, 3)
+        ee_rot_mat = np.array(self.con.getMatrixFromQuaternion(world_orientation)).reshape(3, 3)
         # log.debug(f"EE Rot Mat:\n{ee_rot_mat}")
 
         ee_transform[:3, :3] = ee_rot_mat
-        ee_transform[:3, 3] = pos
+        ee_transform[:3, 3] = world_position
 
         tilt_tf = np.identity(4)
-        tilt_rot = np.array([[1, 0, 0], [0, np.cos(tilt), -np.sin(tilt)], [0, np.sin(tilt), np.cos(tilt)]])
+        tilt_rot = np.array([[1, 0, 0], [0, np.cos(camera.tilt), -np.sin(camera.tilt)], [0, np.sin(camera.tilt), np.cos(camera.tilt)]])
         tilt_tf[:3, :3] = tilt_rot
 
         pan_tf = np.identity(4)
-        pan_rot = np.array([[np.cos(pan), 0, np.sin(pan)], [0, 1, 0], [-np.sin(pan), 0, np.cos(pan)]])
+        pan_rot = np.array([[np.cos(camera.pan), 0, np.sin(camera.pan)], [0, 1, 0], [-np.sin(camera.pan), 0, np.cos(camera.pan)]])
         pan_tf[:3, :3] = pan_rot
 
         tf = ee_transform @ pan_tf @ tilt_tf @ base_offset_tf
         return tf
 
     # TODO: Better types for getCameraImage
-    def get_view_mat_at_curr_pose(self, pan, tilt, xyz_offset) -> np.ndarray:
+    def get_view_mat_at_curr_pose(self, camera: "Camera") -> np.ndarray:
         """Get view matrix at current pose"""
-        pose, orientation = self.get_current_pose(self.tool0_link_index)
+        pos, orientation = self.get_current_pose(camera.tf_frame_index)
         # log.debug(f"tool0 Pose: {pose}, Orientation: {Rotation.from_quat(orientation).as_euler('xyz')}")
 
-        camera_tf = self.create_camera_transform(pose, orientation, pan, tilt, xyz_offset)
+        camera_tf = self.create_camera_transform(pos, orientation, camera)
 
         # Initial vectors
         camera_vector = np.array([0, 0, 1]) @ camera_tf[:3, :3].T  #
@@ -452,12 +452,12 @@ class UR5:
         return view_matrix
 
     def get_camera_location(
-        self, tf_name: str
+        self, camera: "Camera"
     ):  # TODO: get transform from dictionary. choose between rgb or tof frames
-        pose, orientation = self.get_current_pose(self.tool0_link_index)
+        pose, orientation = self.get_current_pose(camera.tf_frame_index)
         tilt = np.pi / 180 * 8
 
-        camera_tf = self.create_camera_transform(pose, orientation, tilt)
+        camera_tf = self.create_camera_transform(camera=camera)
         return camera_tf
 
     def get_condition_number(self) -> float:

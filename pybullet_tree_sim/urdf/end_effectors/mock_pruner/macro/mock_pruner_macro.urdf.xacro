@@ -2,12 +2,13 @@
 <robot xmlns:xacro="https://ros.org/wiki/xacro" name="mock_pruner">
     <!-- Mock Pruner -->
     <xacro:arg name="name" default="mock_pruner"/>
+    <!-- <xacro:arg name="mesh_base_path" default="./"/> -->
     <!-- <xacro:property name="end_effector_parent" value="" /> -->
     
     <!-- Materials -->
     
     
-    <xacro:macro name="mock_pruner_macro" params="eef_prefix eef_parent tof0_offset tof1_offset camera_offset">
+    <xacro:macro name="mock_pruner_macro" params="eef_prefix eef_parent tof0_offset tof1_offset camera_offset mesh_base_path">
         <!-- ================== -->
         <!--     Properties     -->
         <!-- ================== -->
@@ -24,13 +25,13 @@
                 </material>
                 <origin xyz="0 0 0" rpy="0 0 0"/>
                 <geometry>
-                    <mesh filename="./meshes/end_effectors/mock_pruner/MockPrunerASSEMBLED.STL" />
+                    <mesh filename="${mesh_base_path}/end_effectors/mock_pruner/MockPrunerASSEMBLED.STL" />
                 </geometry>
             </visual>
             <collision>
                 <origin xyz="0 0 0" rpy="0 0 0"/>
                 <geometry>
-                    <mesh filename="./meshes/end_effectors/mock_pruner/MockPrunerASSEMBLED.STL" />
+                    <mesh filename="${mesh_base_path}/end_effectors/mock_pruner/MockPrunerASSEMBLED.STL" />
                 </geometry>
             </collision>
             <inertial>
@@ -54,9 +55,9 @@
         <!-- ================== -->
         <!--     Joints        -->
         <!-- ================== -->
-        <joint name="${eef_parent}--${eef_prefix}base_joint" type="fixed">
+        <joint name="${eef_parent}tool0--${eef_prefix}base_joint" type="fixed">
             <origin xyz="0 0 0" rpy="0 0 0"/>
-            <parent link="${eef_parent}"/>
+            <parent link="${eef_parent}tool0"/>
             <child link="${eef_prefix}base"/>
         </joint>
         

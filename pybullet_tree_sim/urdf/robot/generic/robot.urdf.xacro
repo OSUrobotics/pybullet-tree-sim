@@ -13,9 +13,9 @@
 
 
     <!-- Base attachment -->
-    <xacro:arg name="base_attachment_type" default="" />
+    <xacro:arg name="base_type" default="" />
 
-    <xacro:if value="${ '$(arg base_attachment_type)' == 'linear_slider' }" >
+    <xacro:if value="${ '$(arg base_type)' == 'linear_slider' }" >
         <!-- linear slider -->
         <xacro:include filename="$(find linear_slider_description)/urdf/macro/linear_slider_base.urdf.xacro" />
 
@@ -39,22 +39,22 @@
             mock_sensor_commands="$(arg mock_sensor_commands)"
         />
     </xacro:if>
-    <xacro:if value="${ '$(arg base_attachment_type)' == 'farm-ng' }" >
+    <xacro:if value="${ '$(arg base_type)' == 'farm-ng' }" >
         <!-- <xacro:include filename="$(find farm-ng)/urdf" /> -->
     </xacro:if>
 
     <!-- Robot arm type. Current types are UR and Franka Emika -->
     <xacro:arg name="arm_type" default="arm_type" />
-    <xacro:if value="${ '$(arg arm_type)' == 'ur5' }">
+    <xacro:if value="${ '$(arg arm_type)' == 'ur5e' }">
         <xacro:include filename="$(find ur_description)/urdf/ur_macro.xacro"/>
         <!-- UR -->
         <!-- possible 'ur_type' values: ur3, ur3e, ur5, ur5e, ur10, ur10e, ur16e, ur20, ur30 -->
         <!-- the default value should raise an error in case this was called without defining the type -->
-        <xacro:arg name="ur_type" default="ur5x"/>
+        <xacro:arg name="ur_type" default="$(arg arm_type)"/>
         <xacro:arg name="ur_parent" default="${robot_arm_parent}"/>
 
         <!-- parameters -->
-        <xacro:arg name="tf_prefix" default="ur5__" />
+        <xacro:arg name="tf_prefix" default="$(arg arm_type)__" />
         <xacro:arg name="joint_limit_params" default="$(find ur_description)/config/$(arg ur_type)/joint_limits.yaml"/>
         <xacro:arg name="kinematics_params" default="$(find ur_description)/config/$(arg ur_type)/default_kinematics.yaml"/>
         <xacro:arg name="physical_params" default="$(find ur_description)/config/$(arg ur_type)/physical_parameters.yaml"/>
@@ -188,24 +188,26 @@
 
     <!-- Robot arm base/eef attachments -->
     <xacro:arg name="end_effector_type" default=""/> -->
-    <xacro:if value="${ '$(arg end_effector_type)' == 'apple_picker' }">
+    <xacro:if value="${ '$(arg eef_type)' == 'apple_picker' }">
 
     </xacro:if>
-    <xacro:if value="${ '$(arg end_effector_type)' == 'mock_pruner' }" >
+    <xacro:if value="${ '$(arg eef_type)' == 'mock_pruner' }" >
         <xacro:include filename="../../end_effectors/mock_pruner/macro/mock_pruner_macro.urdf.xacro"/>
 
         <!-- Args -->
         <xacro:arg name="eef_parent" default="${end_effector_parent}" />
         <xacro:arg name="eef_prefix" default="mock_pruner__" />
-        <xacro:arg name="tof0_offset" default='0.02'/>
-        <xacro:arg name="tof1_offset" default='-0.02'/>
+        <xacro:arg name="tof0_offset_x" default='0.02'/>
+        <xacro:arg name="tof1_offset_x" default='-0.02'/>
+        <xacro:arg name="mesh_base_path" default="/home/luke/dev/pybullet/pybullet-tree-sim/pybullet_tree_sim/meshes"/>
 
         <xacro:mock_pruner_macro
             eef_prefix="$(arg eef_prefix)"
             eef_parent="$(arg eef_parent)"
-            tof0_offset='$(arg tof0_offset)'
-            tof1_offset='$(arg tof1_offset)'
+            tof0_offset='$(arg tof0_offset_x)'
+            tof1_offset='$(arg tof1_offset_x)'
             camera_offset=''
+            mesh_base_path='$(arg mesh_base_path)'
         />
 
 
