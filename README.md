@@ -25,6 +25,9 @@ urdf generic launch CLI test:
 
 ## Installation
 
+#### Requirements
+ur, linear_slider, franka-emika
+
 #### General use
 ```
 python -m pip install .

@@ -55,31 +55,31 @@
         <!-- ================== -->
         <!--     Joints        -->
         <!-- ================== -->
-        <joint name="${eef_parent}tool0--${eef_prefix}base_joint" type="fixed">
+        <joint name="${eef_parent}tool0--${eef_prefix}base" type="fixed">
             <origin xyz="0 0 0" rpy="0 0 0"/>
             <parent link="${eef_parent}tool0"/>
             <child link="${eef_prefix}base"/>
         </joint>
         
-        <joint name="${eef_prefix}base--camera0_joint" type="fixed">
+        <joint name="${eef_prefix}base--camera0" type="fixed">
             <origin xyz="0 0 0" rpy="0 0 0"/>
             <parent link="${eef_prefix}base" />
             <child link="${eef_prefix}camera0" />
         </joint>
         
-        <joint name="${eef_prefix}base--tof0_joint" type="fixed">
+        <joint name="${eef_prefix}base--tof0" type="fixed">
             <!-- <xacro:insert_block name="origin"/> -->
             <origin xyz="${tof0_offset} 0 0" rpy="0 0 0"/>
             <parent link="${eef_prefix}base" />
             <child link="${eef_prefix}tof0" />
         </joint>
-        <joint name="${eef_prefix}base--tof1_joint" type="fixed">
+        <joint name="${eef_prefix}base--tof1" type="fixed">
             <origin xyz="${tof1_offset} 0 0" rpy="0 0 0"/>
             <parent link="${eef_prefix}base" />
             <child link="${eef_prefix}tof1" />
         </joint>
         
-        <joint name="${eef_prefix}base--${eef_prefix}tool0" type="fixed">
+        <joint name="${eef_prefix}base--tool0" type="fixed">
             <origin xyz="0 0 0" rpy="0 0 0"/>
             <parent link="${eef_prefix}base" />
             <child link="${eef_prefix}tool0" />

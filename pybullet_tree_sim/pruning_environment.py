@@ -58,6 +58,7 @@ class PruningEnv(gym.Env):
         # angle_threshold_perp: float = 0.52,
         # angle_threshold_point: float = 0.52,
         pbutils: PyBUtils,
+        sensor_config: dict,
         # cam_width: int = 424,
         # cam_height: int = 240,
         evaluate: bool = False,
@@ -106,23 +107,7 @@ class PruningEnv(gym.Env):
         self.tree_count = tree_count
         self.is_goal_state = False
 
-        # sensor types
-        self.sensor_attributes = {}  # TODO: Load sensor types from config files
-        camera_configs_path = os.path.join(CONFIG_PATH, "camera")
-        camera_configs_files = glob.glob(os.path.join(camera_configs_path, "*.yaml"))
-        for file in camera_configs_files:
-            yamlcontent = yutils.load_yaml(file)
-            for key, value in yamlcontent.items():
-                self.sensor_attributes[key] = value
-
-        tof_configs_path = os.path.join(CONFIG_PATH, "tof")
-        tof_configs_files = glob.glob(os.path.join(tof_configs_path, "*.yaml"))
-        for file in tof_configs_files:
-            yamlcontent = yutils.load_yaml(file)
-            for key, value in yamlcontent.items():
-                self.sensor_attributes[key] = value
-
-        # log.warning(self.sensor_attributes)
+        
 
         # self.cam_width = cam_width
         # self.cam_height = cam_height
@@ -149,24 +134,47 @@ class PruningEnv(gym.Env):
             "SUPPORT": None,
         }
 
-        # Tree parameters
-        # self.tree_goal_pos = None
-        # self.tree_goal_or = None
-        # self.tree_goal_normal = None
-        # self.tree_urdf_path: str | None = None
-        # self.tree_pos = np.zeros(3, dtype=float)
-        # self.tree_orientation = np.zeros(3, dtype=float)
-        # self.tree_scale: float = 1.0
-
         self.trees = {}
         self.debouce_time = 0.5
         self.last_button_push_time = time.time()
 
-        # UR5 Robot
+        # Load Robot
         if load_robot:
-            self.ur5 = self.load_robot(
-                type=robot_type, robot_pos=robot_pos, robot_orientation=robot_orientation, randomize_pose=False
-            )
+            self.robot = Robot(pbclient=self.pbutils.pbclient)
+            # self.ur5 = self.load_robot(
+            #     type=robot_type, robot_pos=robot_pos, robot_orientation=robot_orientation, randomize_pose=False
+            # )
+    
+        # Load all sensor attributes. # TODO: Load only the required sensor attributes
+        self._load_sensor_attributes()
+        
+        self.sensor_config = sensor_config
+        self._assign_tf_frame_to_sensors(self.sensor_config)
+        # log.warning(self.sensor_attributes)
+        return
+        
+    def _load_sensor_attributes(self):
+        self.sensor_attributes = {}
+        camera_configs_path = os.path.join(CONFIG_PATH, "camera")
+        camera_configs_files = glob.glob(os.path.join(camera_configs_path, "*.yaml"))
+        for file in camera_configs_files:
+            yamlcontent = yutils.load_yaml(file)
+            for key, value in yamlcontent.items():
+                self.sensor_attributes[key] = value
+        tof_configs_path = os.path.join(CONFIG_PATH, "tof")
+        tof_configs_files = glob.glob(os.path.join(tof_configs_path, "*.yaml"))
+        for file in tof_configs_files:
+            yamlcontent = yutils.load_yaml(file)
+            for key, value in yamlcontent.items():
+                self.sensor_attributes[key] = value
+        return
+        
+    def _assign_tf_frame_to_sensors(self, sensor_config: dict):
+        for sensor_name, conf in sensor_config.items():
+            sensor = conf['sensor']
+            sensor.tf_frame = conf['tf_frame']
+            log.warn(f"{sensor.params}")
+            sensor.tf_frame_index = self.robot.robot_conf['joint_info']['mock_pruner__base--camera0']['id']
         return
 
     def load_robot(self, type: str, robot_pos: ArrayLike, robot_orientation: ArrayLike, randomize_pose: bool = False):
@@ -182,7 +190,7 @@ class PruningEnv(gym.Env):
             #     randomize_pose=randomize_pose,
             #     verbose=self.verbose,
             # )
-            robot = Robot()
+            robot = Robot(pbclient=self.pbutils.pbclient)
             
         else:
             raise NotImplementedError(f"Robot type {type} not implemented")
@@ -208,7 +216,7 @@ class PruningEnv(gym.Env):
         if tree_urdf_path is not None:
             if not os.path.exists(tree_urdf_path):
                 raise OSError(
-                    f"There do not seem to be any files of that name, please check your path. Given path was {tree_urdf_path}"
+                    f"There do not seem to be any files of that name, please check your path: {tree_urdf_path}"
                 )
 
         # Get tree object
@@ -566,10 +574,6 @@ class PruningEnv(gym.Env):
             action = np.array([0.0, 0.0, 0, 0.0, 0.0, 0.0])
             keys_pressed = []
         return action
-
-    def run_sim(self) -> int:
-
-        return 0
 
 
 def main():

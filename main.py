@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-
+from pybullet_tree_sim.camera import Camera
+from pybullet_tree_sim.time_of_flight import TimeOfFlight
 from pybullet_tree_sim.pruning_environment import PruningEnv
 from pybullet_tree_sim.tree import Tree
 from pybullet_tree_sim.utils.pyb_utils import PyBUtils
@@ -11,16 +12,23 @@ import time
 from zenlog import log
 
 
-def main():
-    # TODO: CLI args?
-    cam_dfov = 65
-    cam_height = 8
-    cam_width = 8
+def main():    
+    pbutils = PyBUtils(renders=False)
 
-    pbutils = PyBUtils(renders=True, cam_width=cam_width, cam_height=cam_height, dfov=cam_dfov)
+    # Init sensors
+    sensor_config = {
+        "camera0": {
+            'sensor': Camera(pbutils, sensor_name="realsense_d435i"),
+            'tf_frame': "mock_pruner__camera0",
+        }
+    }
+    
+
+    
     penv = PruningEnv(
-        pbutils=pbutils, load_robot=True, robot_pos=[0, 1, 0], verbose=True, cam_width=cam_width, cam_height=cam_height
+        pbutils=pbutils, load_robot=True, sensor_config=sensor_config, robot_pos=[0, 2, 0], verbose=True,
     )
+    
 
     penv.activate_shape(shape="cylinder", radius=2 * 0.0254, height=2.0, orientation=[0, np.pi / 2, 0])
     # penv.load_tree(
@@ -43,14 +51,14 @@ def main():
     # Simulation loop
     while True:
         try:
-            view_matrix = penv.ur5.get_view_mat_at_curr_pose(0, 0, [0, 0, 0])
+            tof0_view_matrix = penv.robot.get_view_mat_at_curr_pose(camera=penv.robot.sensors['mock_pruner__camera0'])
             rgbd = penv.pbutils.get_rgbd_at_cur_pose(type="robot", view_matrix=view_matrix)
             keys_pressed = penv.get_key_pressed()
             action = penv.get_key_action(keys_pressed=keys_pressed)
             action = action.reshape((6, 1))
-            jv, jacobian = penv.ur5.calculate_joint_velocities_from_ee_velocity_dls(end_effector_velocity=action)
-            penv.ur5.action = jv
-            singularity = penv.ur5.set_joint_velocities(penv.ur5.action)
+            jv, jacobian = penv.robot.calculate_joint_velocities_from_ee_velocity_dls(end_effector_velocity=action)
+            penv.robot.action = jv
+            singularity = penv.robot.set_joint_velocities(penv.robot.action)
             penv.pbutils.pbclient.stepSimulation()
             time.sleep(0.01)
         except KeyboardInterrupt:
