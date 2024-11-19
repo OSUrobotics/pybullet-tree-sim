@@ -34,7 +34,7 @@ def get_fov_from_dfov(camera_width: int, camera_height: int, dFoV: Union[int, fl
         _dfov = np.deg2rad(dFoV)
     else:
         _dfov = dFoV
-    camera_diag = np.sqrt(camera_width ** 2 + camera_height ** 2)
+    camera_diag = np.sqrt(camera_width**2 + camera_height**2)
     fov_h = 2 * np.arctan(np.tan(_dfov / 2) * camera_height / camera_diag)
     fov_w = 2 * np.arctan(np.tan(_dfov / 2) * camera_width / camera_diag)
     return (np.rad2deg(fov_w), np.rad2deg(fov_h))

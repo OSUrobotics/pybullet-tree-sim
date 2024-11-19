@@ -12,23 +12,24 @@ import time
 from zenlog import log
 
 
-def main():    
+def main():
     pbutils = PyBUtils(renders=False)
 
     # Init sensors
     sensor_config = {
         "camera0": {
-            'sensor': Camera(pbutils, sensor_name="realsense_d435i"),
-            'tf_frame': "mock_pruner__camera0",
+            "sensor": Camera(pbutils, sensor_name="realsense_d435i"),
+            "tf_frame": "mock_pruner__camera0",
         }
     }
-    
 
-    
     penv = PruningEnv(
-        pbutils=pbutils, load_robot=True, sensor_config=sensor_config, robot_pos=[0, 2, 0], verbose=True,
+        pbutils=pbutils,
+        load_robot=True,
+        sensor_config=sensor_config,
+        robot_pos=[0, 2, 0],
+        verbose=True,
     )
-    
 
     penv.activate_shape(shape="cylinder", radius=2 * 0.0254, height=2.0, orientation=[0, np.pi / 2, 0])
     # penv.load_tree(
@@ -51,7 +52,7 @@ def main():
     # Simulation loop
     while True:
         try:
-            tof0_view_matrix = penv.robot.get_view_mat_at_curr_pose(camera=penv.robot.sensors['mock_pruner__camera0'])
+            tof0_view_matrix = penv.robot.get_view_mat_at_curr_pose(camera=penv.robot.sensors["mock_pruner__camera0"])
             rgbd = penv.pbutils.get_rgbd_at_cur_pose(type="robot", view_matrix=view_matrix)
             keys_pressed = penv.get_key_pressed()
             action = penv.get_key_action(keys_pressed=keys_pressed)
