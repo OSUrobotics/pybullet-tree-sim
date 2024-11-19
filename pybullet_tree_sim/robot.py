@@ -3,7 +3,7 @@ from pybullet_tree_sim.camera import Camera
 from pybullet_tree_sim.time_of_flight import TimeOfFlight
 import pybullet_tree_sim.utils.xacro_utils as xutils
 import pybullet_tree_sim.utils.yaml_utils as yutils
-from pybullet_tree_sim import CONFIG_PATH, URDF_PATH
+from pybullet_tree_sim import CONFIG_PATH, MESHES_PATH, URDF_PATH
 
 from typing import Optional, Tuple
 import numpy as np
@@ -86,12 +86,16 @@ class Robot:
     def _generate_robot_urdf(self) -> None:
         # Get robot params
         self.robot_conf.update(yutils.load_yaml(os.path.join(self._robot_configs_path, "robot.yaml")))
-        self.robot_conf['robot_stack_qty'] = str(len(self.robot_conf["robot_stack"]))        
+        self.robot_conf.update({'robot_stack_qty': str(len(self.robot_conf["robot_stack"]))})  
+        self.robot_conf.update({'mesh_base_path': MESHES_PATH,
+                                'urdf_base_path': URDF_PATH,})      
         
         # Add the required urdf args from each element of the robot_stack config
         for i, robot_part in enumerate(self.robot_conf["robot_stack"]):
             robot_part = robot_part.strip().lower()
             log.warn(i)
+            
+            
             # Assign parent frames
             if i == 0:
                 self.robot_conf.update({f'parent{i}': 'world'})
@@ -110,24 +114,29 @@ class Robot:
             xacro_path=self._robot_xacro_path,
             mappings=self.robot_conf # for some reason, this adds in the rest of the args from the xacro.
         )
+        import pprint as pp
+        # pp.pprint(robot_urdf)
         
         # UR_description uses filename="package://<>" for meshes, and this doesn't work with pybullet
-        if self.robot_conf['arm_type'].startswith('ur'):
-            ur_absolute_mesh_path = '/opt/ros/humble/share/ur_description/meshes'
-            robot_urdf = robot_urdf.toprettyxml().replace(
-                f'filename="package://ur_description/meshes',
-                f'filename="{ur_absolute_mesh_path}'
-            )
-        else:
-            robot_urdf = robot_urdf.toprettyxml()
-
+        try:
+            if self.robot_conf['arm_type'].startswith('ur'):
+                ur_absolute_mesh_path = '/opt/ros/humble/share/ur_description/meshes'
+                robot_urdf = robot_urdf.toprettyxml().replace(
+                    f'filename="package://ur_description/meshes',
+                    f'filename="{ur_absolute_mesh_path}'
+                )
+            else:
+                robot_urdf = robot_urdf.toprettyxml()
+        except KeyError:
+            pass
+        robot_urdf = robot_urdf.toprettyxml()
         # Save the generated URDF
         self.robot_urdf_path = os.path.join(self._urdf_tmp_path, "robot.urdf")
         xutils.save_urdf(robot_urdf, urdf_path=self.robot_urdf_path)
         
         import pprint as pp
         pp.pprint(self.robot_conf)
-        pp.pprint(robot_urdf)
+        # pp.pprint(robot_urdf)
         log.warn("hello")
         import sys
         sys.exit(0)

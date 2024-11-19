@@ -1,5 +1,4 @@
 eef_type: mock_pruner
-eef_parent: ur5e__ # TODO: take care of __ in urdf
-eef_prefix: mock_pruner__
+mock_pruner_prefix: mock_pruner__
 tof0_offset_x: "0.02"
 tof1_offset_x: "-0.02"
