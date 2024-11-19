@@ -2,6 +2,7 @@
 from pybullet_tree_sim import CONFIG_PATH, MESHES_PATH, URDF_PATH, RGB_LABEL, ROBOT_URDF_PATH
 from pybullet_tree_sim.robot import Robot
 from pybullet_tree_sim.tree import Tree, TreeException
+
 # from pybullet_tree_sim.utils.ur5_utils import UR5
 from pybullet_tree_sim.utils.pyb_utils import PyBUtils
 import pybullet_tree_sim.utils.xacro_utils as xutils
@@ -107,8 +108,6 @@ class PruningEnv(gym.Env):
         self.tree_count = tree_count
         self.is_goal_state = False
 
-        
-
         # self.cam_width = cam_width
         # self.cam_height = cam_height
         # self.cam_pan = 0
@@ -144,15 +143,15 @@ class PruningEnv(gym.Env):
             # self.ur5 = self.load_robot(
             #     type=robot_type, robot_pos=robot_pos, robot_orientation=robot_orientation, randomize_pose=False
             # )
-    
+
         # Load all sensor attributes. # TODO: Load only the required sensor attributes
         self._load_sensor_attributes()
-        
+
         self.sensor_config = sensor_config
         self._assign_tf_frame_to_sensors(self.sensor_config)
         # log.warning(self.sensor_attributes)
         return
-        
+
     def _load_sensor_attributes(self):
         self.sensor_attributes = {}
         camera_configs_path = os.path.join(CONFIG_PATH, "camera")
@@ -168,13 +167,13 @@ class PruningEnv(gym.Env):
             for key, value in yamlcontent.items():
                 self.sensor_attributes[key] = value
         return
-        
+
     def _assign_tf_frame_to_sensors(self, sensor_config: dict):
         for sensor_name, conf in sensor_config.items():
-            sensor = conf['sensor']
-            sensor.tf_frame = conf['tf_frame']
+            sensor = conf["sensor"]
+            sensor.tf_frame = conf["tf_frame"]
             log.warn(f"{sensor.params}")
-            sensor.tf_frame_index = self.robot.robot_conf['joint_info']['mock_pruner__base--camera0']['id']
+            sensor.tf_frame_index = self.robot.robot_conf["joint_info"]["mock_pruner__base--camera0"]["id"]
         return
 
     def load_robot(self, type: str, robot_pos: ArrayLike, robot_orientation: ArrayLike, randomize_pose: bool = False):
@@ -191,7 +190,7 @@ class PruningEnv(gym.Env):
             #     verbose=self.verbose,
             # )
             robot = Robot(pbclient=self.pbutils.pbclient)
-            
+
         else:
             raise NotImplementedError(f"Robot type {type} not implemented")
         return robot
@@ -589,7 +588,7 @@ def main():
     # data = data.reshape((cam_width * cam_height, 1), order="F")
 
     # log.warning(f"joint angles: {penv.ur5.get_joint_angles()}")
-    
+
     return
 
 
