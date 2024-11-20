@@ -55,27 +55,21 @@ class PruningEnv(gym.Env):
 
     def __init__(
         self,
-        # angle_threshold_perp: float = 0.52,
-        # angle_threshold_point: float = 0.52,
         pbutils: PyBUtils,
-        sensor_config: dict,
-        # cam_width: int = 424,
-        # cam_height: int = 240,
-        evaluate: bool = False,
-        # distance_threshold: float = 0.05,
-        max_steps: int = 1000,
+        # max_steps: int = 1000,
         make_trees: bool = False,
         name: str = "PruningEnv",
-        num_trees: int | None = None,
+        # num_trees: int | None = None,
         renders: bool = False,
         tree_count: int = 10,
         # tree_urdf_path: str | None = None,
         # tree_obj_path: str | None = None,
         verbose: bool = True,
-        load_robot: bool = True,
-        robot_type: str = "ur5",
-        robot_pos: ArrayLike = np.array([0, 0, 0]),
-        robot_orientation: ArrayLike = np.array([0, 0, 0, 1]),
+        # load_robot: bool = True,
+        robots: dict = {},
+        # robot_type: str = "ur5",
+        # robot_pos: ArrayLike = np.array([0, 0, 0]),
+        # robot_orientation: ArrayLike = np.array([0, 0, 0, 1]),
         # use_ik: bool = True,
         #
     ) -> None:
@@ -83,13 +77,7 @@ class PruningEnv(gym.Env):
 
         Parameters
         ----------
-            cam_width (int): Pixel width of the camera
-            cam_height (int): Pixel height of the camera
-            evaluate (bool): Is this environment for evaluation
-            max_steps (int): Maximum number of steps in a single run
-            name (str): Name of the environment (default="PruningEnv")
-            renders (bool): Whether to render the environment
-            tree_count (int): Number of trees to be loaded
+            ...
         """
         super().__init__()
         self.pbutils = pbutils
@@ -97,15 +85,15 @@ class PruningEnv(gym.Env):
         # Pybullet GUI variables
         self.render_mode = "rgb_array"
         self.renders = renders
-        self.eval = evaluate
+        # self.eval = evaluate
 
         # Gym variables
         self.name = name
-        self.step_counter = 0
-        self.global_step_counter = 0
+        # self.step_counter = 0
+        # self.global_step_counter = 0
         # self.max_steps = max_steps
         self.tree_count = tree_count
-        self.is_goal_state = False
+        # self.is_goal_state = False
 
         
 
@@ -138,18 +126,19 @@ class PruningEnv(gym.Env):
         self.debouce_time = 0.5
         self.last_button_push_time = time.time()
 
-        # Load Robot
-        if load_robot:
-            self.robot = Robot(pbclient=self.pbutils.pbclient)
+        # Load Robots
+        self.robots = robots
+        # if load_robot:
+        #     self.robot = Robot(pbclient=self.pbutils.pbclient)
             # self.ur5 = self.load_robot(
             #     type=robot_type, robot_pos=robot_pos, robot_orientation=robot_orientation, randomize_pose=False
             # )
-    
+            
         # Load all sensor attributes. # TODO: Load only the required sensor attributes
         self._load_sensor_attributes()
         
-        self.sensor_config = sensor_config
-        self._assign_tf_frame_to_sensors(self.sensor_config)
+        log.warn(self.robots['pruning_robot'].sensors)
+        # self.sensor_config = sensor_config
         # log.warning(self.sensor_attributes)
         return
         
@@ -169,13 +158,6 @@ class PruningEnv(gym.Env):
                 self.sensor_attributes[key] = value
         return
         
-    def _assign_tf_frame_to_sensors(self, sensor_config: dict):
-        for sensor_name, conf in sensor_config.items():
-            sensor = conf['sensor']
-            sensor.tf_frame = conf['tf_frame']
-            log.warn(f"{sensor.params}")
-            sensor.tf_frame_index = self.robot.robot_conf['joint_info']['mock_pruner__base--camera0']['id']
-        return
 
     def load_robot(self, type: str, robot_pos: ArrayLike, robot_orientation: ArrayLike, randomize_pose: bool = False):
         """Load a robot into the environment. Currently only UR5 is supported. TODO: Add Panda"""
@@ -468,7 +450,7 @@ class PruningEnv(gym.Env):
         # point_mask = np.expand_dims(point_mask_resize, axis=0).astype(np.float32)
         return point_mask
 
-    def is_reachable(self, vertex: Tuple[np.ndarray], base_xyz: np.ndarray) -> bool:
+    def is_reachable(self, robot: Robot, vertex: Tuple[np.ndarray], base_xyz: np.ndarray) -> bool:
         # if vertex[3] != "SPUR":
         #     return False
         ur5_base_pos = np.array(base_xyz)
@@ -479,7 +461,7 @@ class PruningEnv(gym.Env):
         if dist >= 0.98:  # TODO: is this for the UR5? Should it be from a parameter file?
             return False
 
-        j_angles = self.robot.calculate_ik(vertex[0], None)
+        j_angles = robot.calculate_ik(vertex[0], None)
         # env.ur5.set_joint_angles(j_angles)
         # for _ in range(100):
         #     pyb.con.stepSimulation()
@@ -509,7 +491,7 @@ class PruningEnv(gym.Env):
             keys_pressed.append(key)
         return keys_pressed
 
-    def get_key_action(self, keys_pressed: list) -> np.ndarray:
+    def get_key_action(self, robot: Robot, keys_pressed: list) -> np.ndarray:
         """Return an action based on the keys pressed."""
         action = np.array([0.0, 0.0, 0, 0.0, 0.0, 0.0])
         if keys_pressed:
@@ -540,9 +522,9 @@ class PruningEnv(gym.Env):
             if ord("p") in keys_pressed:
                 if time.time() - self.last_button_push_time > self.debouce_time:
                     # Get view and projection matrices
-                    view_matrix = self.ur5.get_view_mat_at_curr_pose(pan=0, tilt=0, xyz_offset=[0, 0, 0])
+                    view_matrix = robot.get_view_mat_at_curr_pose(camera=robot.sensors['camera0']['sensor'])
                     log.warning(f"button p pressed")
-                    rgb, depth = self.pbutils.get_rgbd_at_cur_pose(type="robot", view_matrix=view_matrix)
+                    rgb, depth = self.pbutils.get_rgbd_at_cur_pose(camera=robot.sensors['camera0']['sensor'], type="robot", view_matrix=view_matrix)
                     # log.debug(f'depth:\n{depth}')
                     depth = -1 * depth.reshape((self.cam_width * self.cam_height, 1), order="F")
                     world_points = self.deproject_pixels_to_points(

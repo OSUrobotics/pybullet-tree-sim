@@ -2,6 +2,7 @@
 from pybullet_tree_sim.camera import Camera
 from pybullet_tree_sim.time_of_flight import TimeOfFlight
 from pybullet_tree_sim.pruning_environment import PruningEnv
+from pybullet_tree_sim.robot import Robot
 from pybullet_tree_sim.tree import Tree
 from pybullet_tree_sim.utils.pyb_utils import PyBUtils
 from pybullet_tree_sim.utils.camera_helpers import get_fov_from_dfov
@@ -20,13 +21,27 @@ def main():
         "camera0": {
             'sensor': Camera(pbutils, sensor_name="realsense_d435i"),
             'tf_frame': "mock_pruner__camera0",
+        },
+        'tof0': {
+            'sensor': TimeOfFlight(pbutils, sensor_name="vl6180"),
+            'tf_frame': "mock_pruner__tof0",
+        },
+        'tof1': {
+            'sensor': TimeOfFlight(pbutils, sensor_name="vl6180"),
+            'tf_frame': "mock_pruner__tof1",
         }
     }
     
+    robots = {
+        'pruning_robot': Robot(
+            pbclient=pbutils.pbclient,
+            sensor_config=sensor_config,
+            position = [0, 1, 0],
+            orientation = [0, 0, 0, 1])
+    }
 
-    
     penv = PruningEnv(
-        pbutils=pbutils, load_robot=True, sensor_config=sensor_config, robot_pos=[0, 2, 0], verbose=True,
+        pbutils=pbutils, robots=robots, verbose=True,
     )
     
 
@@ -48,25 +63,25 @@ def main():
         pbutils.pbclient.stepSimulation()
         time.sleep(0.1)
         
-    time.sleep(30)
-
+    # time.sleep(30)
+    robot = penv.robots['pruning_robot']
     # Simulation loop
     while True:
         try:
-            tof0_view_matrix = penv.robot.get_view_mat_at_curr_pose(camera=penv.robot.sensors['mock_pruner__camera0'])
-            rgbd = penv.pbutils.get_rgbd_at_cur_pose(type="robot", view_matrix=view_matrix)
+            sensor_view_matrix = robot.get_view_mat_at_curr_pose(camera=robot.sensors['mock_pruner__camera0'])
+            rgbd = penv.pbutils.get_rgbd_at_cur_pose(camera=robot.sensors['mock_pruner__camera0'], type="robot", view_matrix=sensor_view_matrix)
             keys_pressed = penv.get_key_pressed()
-            action = penv.get_key_action(keys_pressed=keys_pressed)
+            action = penv.get_key_action(robot=robot, keys_pressed=keys_pressed)
             action = action.reshape((6, 1))
-            jv, jacobian = penv.robot.calculate_joint_velocities_from_ee_velocity_dls(end_effector_velocity=action)
-            penv.robot.action = jv
-            singularity = penv.robot.set_joint_velocities(penv.robot.action)
+            joint_vel, jacobian = robot.calculate_joint_velocities_from_ee_velocity_dls(end_effector_velocity=action)
+            robot.action = joint_vel
+            singularity = robot.set_joint_velocities(robot.action)
             penv.pbutils.pbclient.stepSimulation()
             time.sleep(0.01)
         except KeyboardInterrupt:
             break
 
-    # penv.deactivate_tree(tree_id_str="LPy_envy_tree1")
+    # penv.deactivate_tree(tree_id_str="LPy_tree1")
     penv.pbutils.pbclient.disconnect()
     return
 

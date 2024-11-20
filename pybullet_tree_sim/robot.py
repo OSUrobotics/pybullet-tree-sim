@@ -22,6 +22,7 @@ class Robot:
     def __init__(
         self,
         pbclient,
+        sensor_config: dict = {},
         # robot_type: str,
         # robot_urdf_path: str,
         # tool_link_name: str,
@@ -32,7 +33,7 @@ class Robot:
         # robot_collision_filter_idxs,
         # init_joint_angles: Optional[list] = None,
         position=(0, 0, 0),
-        orientation=(0, 0, 0, 1),
+        orientation=(0, 0, 0, 1),   
         randomize_pose=False,
         verbose=1
         # **kwargs
@@ -58,8 +59,10 @@ class Robot:
         #     [0.063179, 0.077119, 0.0420027])
         self.verbose = verbose
 
-        self.joints = None
+        
         self.robot = None
+        self.joints = None
+        self.sensors = {}
         # self.robot_conf["control_joints"] = control_joints
         # self.robot_collision_filter_idxs = robot_collision_filter_idxs
         # 
@@ -78,6 +81,9 @@ class Robot:
         self._generate_robot_urdf()
         self._assign_control_joints()
         self.setup_robot()
+        
+        self._assign_tf_frame_to_sensors(sensor_config)
+        log.warn(self.sensors)
         
         self.action = None
 
@@ -129,6 +135,14 @@ class Robot:
         self.robot_urdf_path = os.path.join(self._urdf_tmp_path, "robot.urdf")
         xutils.save_urdf(robot_urdf, urdf_path=self.robot_urdf_path)
         
+        return
+        
+    def _assign_tf_frame_to_sensors(self, sensor_config: dict):
+        for sensor_name, conf in sensor_config.items():
+            sensor = conf['sensor']
+            sensor.tf_frame = conf['tf_frame']
+            log.warn(f"{sensor.params}")
+            sensor.tf_frame_index = self.robot_conf['joint_info']['mock_pruner__base--camera0']['id']
         return
 
     def _assign_control_joints(self) -> None:
@@ -241,8 +255,8 @@ class Robot:
                     )
                 # self.joints[info.name] = info
 
-        import pprint as pp
-        pp.pprint(self.robot_conf)
+        # import pprint as pp
+        # pp.pprint(self.robot_conf)
 
         self.set_joint_angles_no_collision(self.init_joint_angles)
         self.pbclient.stepSimulation()
@@ -280,12 +294,17 @@ class Robot:
         for i in range(num_joints):
             info = self.pbclient.getJointInfo(self.robot, i)
             child_link_name = info[12].decode('utf-8')
-
+            log.info(f"{child_link_name}, {i}")
             # This is kinda hacky, but it works for now. TODO: make better?
-            if child_link_name.endswith('base'):
-                self.robot_collision_filter_idxs.append((i, i-1))
-            # self.robot_conf["joint_info"].update({child_link_name: i})
-        log.warn(self.robot_collision_filter_idxs)
+        #     if child_link_name.endswith('base'):
+        #         self.robot_collision_filter_idxs.append((i, i-1))
+        #         log.warn(f'{child_link_name}, {i}')
+        #     if child_link_name.endswith('tool0'):
+        #         log.warn(f'{child_link_name}, {i}')
+        #     # self.robot_conf["joint_info"].update({child_link_name: i})
+        # self.robot_collision_filter_idxs.append((25, 2))
+
+        # log.warn(self.robot_collision_filter_idxs)
         # log.warn()
         return
 
