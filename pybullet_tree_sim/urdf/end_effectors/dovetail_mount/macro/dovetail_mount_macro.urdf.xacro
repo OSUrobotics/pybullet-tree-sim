@@ -106,6 +106,9 @@
     
     
     <xacro:macro name="dovetail_mount_macro" params="parent_link dovetail_male_mount_prefix dovetail_female_mount_prefix mesh_base_path">
+        <!-- =================== -->
+        <!--   Dovetail Mount    -->
+        <!-- =================== -->
         <xacro:dovetail_male_mount_macro 
             parent_link="${parent_link}" 
             dovetail_male_mount_prefix="${dovetail_male_mount_prefix}"

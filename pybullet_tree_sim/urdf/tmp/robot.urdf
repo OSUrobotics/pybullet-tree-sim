@@ -11,9 +11,6 @@
 	<!-- <xacro:arg name="mesh_base_path" default="./"/> -->
 	<!-- <xacro:property name="end_effector_parent" value="" /> -->
 	<!-- Materials -->
-	<!-- ================== -->
-	<!--       Links        -->
-	<!-- ================== -->
 	<!-- ==================== -->
 	<!-- Dovetail Male Mount  -->
 	<!-- ==================== -->
@@ -104,6 +101,12 @@
 		<parent link="dovetail_female_mount__body"/>
 		<child link="dovetail_female_mount__tool0"/>
 	</joint>
+	<!-- ==================== -->
+	<!--  Mock Pruner Macro   -->
+	<!-- ==================== -->
+	<!-- ================== -->
+	<!--       Links        -->
+	<!-- ================== -->
 	<link name="mock_pruner__base">
 		<visual>
 			<material name="orange">
@@ -694,7 +697,7 @@
 	<!-- <link name="$(arg robot_part${stack_qty - 1})" /> -->
 	<!-- </xacro:unless> -->
 	<!-- ================== -->
-	<!--     Materials      -->
+	<!--     Cart Maacro    -->
 	<!-- ================== -->
 	<material name="LightGrey">
 		<color rgba="0.7 0.7 0.7 1.0"/>
@@ -705,14 +708,14 @@
 	<link name="cart__base"/>
 	<link name="cart__cart">
 		<visual>
-			<origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"/>
+			<origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.75711"/>
 			<geometry>
 				<mesh filename="/home/luke/dev/pybullet/pybullet-tree-sim/pybullet_tree_sim/meshes/base_mounts/cart/cart.obj"/>
 			</geometry>
 			<material name="LightGrey"/>
 		</visual>
 		<collision>
-			<origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"/>
+			<origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 -0.378555"/>
 			<geometry>
 				<box size="0.5 0.5 0.75711"/>
 			</geometry>

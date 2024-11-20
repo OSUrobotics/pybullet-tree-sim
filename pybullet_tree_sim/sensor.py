@@ -47,6 +47,9 @@ def main():
 
     sensor = Sensor(sensor_name="vl53l8cx", sensor_type="tof")
     print(sensor.params)
+    
+    sensor = Sensor(sensor_name="vl6180", sensor_type="tof")
+    print(sensor.params)
 
     return
 
