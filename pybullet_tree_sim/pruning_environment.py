@@ -182,14 +182,6 @@ class PruningEnv(gym.Env):
         type = type.strip().lower()
         if type == "ur5":
             log.info("Loading UR5 Robot")
-            # robot = UR5(
-            #     con=self.pbutils.pbclient,
-            #     robot_urdf_path=ROBOT_URDF_PATH,
-            #     pos=robot_pos,
-            #     orientation=robot_orientation,
-            #     randomize_pose=randomize_pose,
-            #     verbose=self.verbose,
-            # )
             robot = Robot(pbclient=self.pbutils.pbclient)
             
         else:
@@ -487,7 +479,7 @@ class PruningEnv(gym.Env):
         if dist >= 0.98:  # TODO: is this for the UR5? Should it be from a parameter file?
             return False
 
-        j_angles = self.ur5.calculate_ik(vertex[0], None)
+        j_angles = self.robot.calculate_ik(vertex[0], None)
         # env.ur5.set_joint_angles(j_angles)
         # for _ in range(100):
         #     pyb.con.stepSimulation()

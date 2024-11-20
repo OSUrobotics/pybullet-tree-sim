@@ -106,40 +106,29 @@ class Robot:
             # Add each robot part's config to the robot_conf
             self.robot_conf.update(yutils.load_yaml(os.path.join(self._robot_configs_path, f"{robot_part}.yaml")))
             
-        import pprint as pp
-        pp.pprint(self.robot_conf)
+        
             
         # Generate URDF from mappings
         robot_urdf = xutils.load_urdf_from_xacro(
             xacro_path=self._robot_xacro_path,
             mappings=self.robot_conf # for some reason, this adds in the rest of the args from the xacro.
         )
-        import pprint as pp
-        # pp.pprint(robot_urdf)
-        
         # UR_description uses filename="package://<>" for meshes, and this doesn't work with pybullet
-        try:
-            if self.robot_conf['arm_type'].startswith('ur'):
+        for i, robot_part in enumerate(self.robot_conf["robot_stack"]):
+            if robot_part.startswith('ur'):
                 ur_absolute_mesh_path = '/opt/ros/humble/share/ur_description/meshes'
                 robot_urdf = robot_urdf.toprettyxml().replace(
                     f'filename="package://ur_description/meshes',
                     f'filename="{ur_absolute_mesh_path}'
                 )
-            else:
-                robot_urdf = robot_urdf.toprettyxml()
-        except KeyError:
-            pass
-        robot_urdf = robot_urdf.toprettyxml()
+        else:
+            # robot_urdf = robot_urdf.toprettyxml()
+            ...
+            
         # Save the generated URDF
         self.robot_urdf_path = os.path.join(self._urdf_tmp_path, "robot.urdf")
         xutils.save_urdf(robot_urdf, urdf_path=self.robot_urdf_path)
         
-        import pprint as pp
-        pp.pprint(self.robot_conf)
-        # pp.pprint(robot_urdf)
-        log.warn("hello")
-        import sys
-        sys.exit(0)
         return
 
     def _assign_control_joints(self) -> None:
