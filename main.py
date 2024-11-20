@@ -13,7 +13,7 @@ from zenlog import log
 
 
 def main():    
-    pbutils = PyBUtils(renders=False)
+    pbutils = PyBUtils(renders=True)
 
     # Init sensors
     sensor_config = {
@@ -30,7 +30,7 @@ def main():
     )
     
 
-    penv.activate_shape(shape="cylinder", radius=2 * 0.0254, height=2.0, orientation=[0, np.pi / 2, 0])
+    # penv.activate_shape(shape="cylinder", radius=2 * 0.0254, height=2.0, orientation=[0, np.pi / 2, 0])
     # penv.load_tree(
     #     pbutils=pbutils,
     #     scale=1.0,
@@ -47,6 +47,8 @@ def main():
     for i in range(100):
         pbutils.pbclient.stepSimulation()
         time.sleep(0.1)
+        
+    time.sleep(30)
 
     # Simulation loop
     while True:

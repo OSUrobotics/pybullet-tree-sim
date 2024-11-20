@@ -31,7 +31,7 @@
             <material name="LightGrey"/>
         </visual>
         <collision>
-            <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 -0.3786"/>
+            <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"/>
             <geometry>
                 <box size="${cart_collision_box_x} ${cart_collision_box_y} ${cart_collision_box_z}"/>
             </geometry>
