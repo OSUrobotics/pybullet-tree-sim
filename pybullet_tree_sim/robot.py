@@ -1,57 +1,258 @@
+#!/usr/bin/env python3
+from pybullet_tree_sim.camera import Camera
+from pybullet_tree_sim.time_of_flight import TimeOfFlight
+import pybullet_tree_sim.utils.xacro_utils as xutils
+import pybullet_tree_sim.utils.yaml_utils as yutils
+from pybullet_tree_sim import CONFIG_PATH, MESHES_PATH, URDF_PATH
+
+import glob
 from typing import Optional, Tuple
 import numpy as np
+from pathlib import Path
 import pybullet
-from collections import namedtuple
+import os
+
+from zenlog import log
+import pprint as pp
+from scipy.spatial.transform import Rotation
 
 
 class Robot:
+
+    _robot_configs_path = os.path.join(CONFIG_PATH, "description", "robot")
+    _robot_xacro_path = os.path.join(URDF_PATH, "robot", "generic", "robot.urdf.xacro")
+    _urdf_tmp_path = os.path.join(URDF_PATH, "tmp")
+
     def __init__(
         self,
-        con,
-        robot_type: str,
-        robot_urdf_path: str,
-        tool_link_name: str,
-        end_effector_link_name: str,
-        success_link_name: str,
-        base_link_name: str,
-        control_joints,
-        robot_collision_filter_idxs,
-        init_joint_angles: Optional[list] = None,
-        pos=(0, 0, 0),
+        pbclient,
+        # robot_type: str,
+        # robot_urdf_path: str,
+        # tool_link_name: str,
+        # end_effector_link_name: str,
+        # success_link_name: str,
+        # base_link_name: str,
+        # control_joints,
+        # robot_collision_filter_idxs,
+        # init_joint_angles: Optional[list] = None,
+        position=(0, 0, 0),
         orientation=(0, 0, 0, 1),
         randomize_pose=False,
-        verbose=1,
+        verbose=True,
     ) -> None:
-        self.con = con
-        self.robot_type = robot_type
-        self.robot_urdf_path = robot_urdf_path
-        self.tool_link_name = tool_link_name
-        self.end_effector_link_name = end_effector_link_name
-        self.success_link_name = success_link_name
-        self.base_link_name = base_link_name
-        self.init_joint_angles = init_joint_angles
-        self.pos = pos
+        self.pbclient = pbclient
+        self.verbose = verbose
+        # self.robot_type = robot_type
+        # self.robot_urdf_path = robot_urdf_path
+        # self.tool_link_name = tool_link_name
+        # self.end_effector_link_name = end_effector_link_name
+        # self.success_link_name = success_link_name
+        # self.base_link_name = base_link_name
+        # self.init_joint_angles = init_joint_angles
+        self.pos = position
         self.orientation = orientation
         self.randomize_pose = randomize_pose
-
-        self.joint_info = namedtuple(
-            "jointInfo", ["id", "name", "type", "lowerLimit", "upperLimit", "maxForce", "maxVelocity", "controllable"]
+        self.init_joint_angles = (
+            -np.pi / 2,
+            -np.pi * 2 / 3,
+            np.pi * 2 / 3,
+            -np.pi,
+            -np.pi / 2,
+            np.pi,
         )
-        # Pruning camera information
-        self.camera_base_offset = np.array([0.063179, 0.077119, 0.0420027])
-        self.verbose = verbose
 
-        self.joints = None
+        # Robot setup
         self.robot = None
-        self.control_joints = control_joints
-        self.robot_collision_filter_idxs = robot_collision_filter_idxs
-        self.setup_robot()
+        # Load robot URDF config
+        self.robot_conf = {}
+        # self.robot_conf["joint_info"] = {}
+        self._generate_robot_urdf()
+        self._setup_robot()
+        num_joints = self.pbclient.getNumJoints(self.robot)
 
-    def setup_robot(self):
+        # Joints
+        self.joints = self._get_joints()
+        self.control_joints, self.control_joint_idxs = self._assign_control_joints(self.joints)
+
+        # Links
+        self.links = self._get_links()
+        self.robot_collision_filter_idxs = self._assign_collision_links()
+        self.set_collision_filter(self.robot_collision_filter_idxs)
+        self.tool0_link_idx = self._get_tool0_link_idx()
+
+        # Sensors
+        self.sensors = self._get_sensors()
+
+        self.action = None
+        self.set_joint_angles_no_collision(self.init_joint_angles)
+        self.pbclient.stepSimulation()
+        return
+
+    def _generate_robot_urdf(self) -> None:
+        # Get robot params
+        self.robot_conf.update(yutils.load_yaml(os.path.join(self._robot_configs_path, "robot.yaml")))
+        self.robot_conf.update({"robot_stack_qty": str(len(self.robot_conf["robot_stack"]))})
+        self.robot_conf.update(
+            {
+                "mesh_base_path": MESHES_PATH,
+                "urdf_base_path": URDF_PATH,
+            }
+        )
+        # Add the required urdf args from each element of the robot_stack config
+        for i, robot_part in enumerate(self.robot_conf["robot_stack"]):
+            robot_part = robot_part.strip().lower()
+            # Assign parent frames
+            if i == 0:
+                self.robot_conf.update({f"parent{i}": "world"})
+            else:
+                self.robot_conf.update({f"parent{i}": self.robot_conf["robot_stack"][i - 1]})
+            # Assign part frame ids
+            self.robot_conf.update({f"robot_part{i}": self.robot_conf["robot_stack"][i]})
+            # Add each robot part's config to the robot_conf
+            part_conf = yutils.load_yaml(os.path.join(self._robot_configs_path, f"{robot_part}.yaml"))
+            if part_conf is not None:
+                self.robot_conf.update(part_conf)
+            else:
+                raise ValueError(f"Robot part {robot_part} not found in {self._robot_configs_path}")
+
+        # Generate URDF from mappings
+        robot_urdf = xutils.load_urdf_from_xacro(
+            xacro_path=self._robot_xacro_path,
+            mappings=self.robot_conf,  # for some reason, this adds in the rest of the args from the xacro.
+        )
+        robot_urdf = robot_urdf.toprettyxml()
+
+        # UR_description uses filename="package://<>" for meshes, and this doesn't work with pybullet
+        for i, robot_part in enumerate(self.robot_conf["robot_stack"]):
+            if robot_part.startswith("ur"):
+                ur_absolute_mesh_path = "/opt/ros/humble/share/ur_description/meshes"
+                robot_urdf = robot_urdf.replace(
+                    f'filename="package://ur_description/meshes', f'filename="{ur_absolute_mesh_path}'
+                )
+        # Save the generated URDF
+        self.robot_urdf_path = os.path.join(self._urdf_tmp_path, "robot.urdf")
+        xutils.save_urdf(robot_urdf, urdf_path=self.robot_urdf_path)
+        return
+
+    def _get_joints(self) -> dict:
+        """Return a dict of joint information for the robot"""
+        joints = {}
+        for i in range(self.num_joints):
+            info = self.pbclient.getJointInfo(self.robot, i)
+            joint_name = info[1].decode("utf-8")
+            joints.update(
+                {
+                    joint_name: {
+                        "id": i,
+                        "type": info[2],
+                        "lower_limit": info[8],
+                        "upper_limit": info[9],
+                        "max_force": info[10],
+                        "max_velocity": info[11],
+                    }
+                }
+            )
+        return joints
+
+    def _assign_control_joints(self, joints: dict) -> list:
+        """Get list of controllabe joints from the joint dict by joint type"""
+        control_joints = []
+        control_joint_idxs = []
+        for joint, joint_info in joints.items():
+            if joint_info["type"] == 0:
+                control_joints.append(joint)
+                control_joint_idxs.append(joint_info["id"])
+        return control_joints, control_joint_idxs
+
+    def _get_links(self) -> dict:
+        links = {}
+        for i in range(self.num_joints):
+            info = self.pbclient.getJointInfo(self.robot, i)
+            child_link_name = info[12].decode("utf-8")
+            links.update({child_link_name: i})
+        return links
+
+    def _assign_collision_links(self) -> list:
+        """Find tool0/base pairs, add to collision filter list.
+        Requires that the robot part is ordered from base to tool0."""
+        robot_collision_filter_idxs = []
+        for i, robot_part in enumerate(self.robot_conf["robot_stack"]):
+            joint_info = self.pbclient.getJointInfo(self.robot, i)
+            if i == 0:
+                continue
+            else:
+                if (
+                    robot_part + "__base" in self.links.keys()
+                    and self.robot_conf["robot_stack"][i - 1] + "__tool0" in self.links.keys()
+                ):
+                    robot_collision_filter_idxs.append(
+                        (
+                            self.links[robot_part + "__base"],
+                            self.links[self.robot_conf["robot_stack"][i - 1] + "__tool0"],
+                        )
+                    )
+        return robot_collision_filter_idxs
+
+    def _get_tool0_link_idx(self):
+
+        return self.links[self.robot_conf["robot_stack"][-1] + "__tool0"]
+
+    # def _get_sensor_attributes(self) -> dict:
+    #     # TODO: refactor to only load required sensors
+    #     sensor_attributes = {}
+    #     # Cameras
+    #     camera_configs_path = os.path.join(CONFIG_PATH, "description", "camera",)
+    #     camera_configs_files = glob.glob(os.path.join(camera_configs_path, "*.yaml"))
+    #     for file in camera_configs_files:
+    #         yamlcontent = yutils.load_yaml(file)
+    #         # for key, value in yamlcontent.items():
+    #         sensor_attributes.update({Path(file).stem: yamlcontent})
+    #     # ToFs: TODO: lots of repetitive code here, refactor
+    #     tof_configs_path = os.path.join(CONFIG_PATH, "description", "tof")
+    #     tof_configs_files = glob.glob(os.path.join(tof_configs_path, "*.yaml"))
+    #     for file in tof_configs_files:
+    #         yamlcontent = yutils.load_yaml(file)
+    #         for key, value in yamlcontent.items():
+    #             sensor_attributes.update({Path(file).stem: yamlcontent})
+    #     return sensor_attributes
+
+    def _get_sensors(self) -> dict:
+        """Get sensors on robot based on runtime config files"""
+        sensors = {}
+        robot_part_runtime_conf_path = os.path.join(CONFIG_PATH, "runtime")
+        for robot_part in self.robot_conf["robot_stack"]:
+            robot_part_runtime_conf_file = os.path.join(robot_part_runtime_conf_path, f"{robot_part}.yaml")
+            robot_part_conf = yutils.load_yaml(robot_part_runtime_conf_file)
+            if robot_part_conf is None:
+                log.warn(f"Could not load configuration for {robot_part_runtime_conf_file}")
+                continue
+            try:
+                sensor_conf = robot_part_conf["sensors"]
+            except KeyError:
+                log.warn(f"No sensor configuration found for {robot_part} in {robot_part_runtime_conf_file}")
+                continue
+            # Create sensors
+            for sensor_name, metadata in sensor_conf.items():
+                if metadata["type"] == "camera":
+                    sensors.update({sensor_name: Camera(pbclient=self.pbclient, sensor_name=metadata["name"])})
+                elif metadata["type"] == "tof":
+                    sensors.update({sensor_name: TimeOfFlight(pbclient=self.pbclient, sensor_name=metadata["name"])})
+                # Assign TF frame and pybullet frame id to sensor
+                sensors[sensor_name].tf_frame = (
+                    robot_part + "__" + metadata["tf_frame"]
+                )  # TODO: find a better way to get the prefix. If
+                # from robot_conf, need standard for all robots
+                sensors[sensor_name].tf_id = self.links[sensors[sensor_name].tf_frame]
+
+            # for key, value in yamlcontent.items():
+            #     sensors.update({Path(file).stem: yamlcontent})
+        return sensors
+
+    def _setup_robot(self):
         if self.robot is not None:
-            self.con.removeBody(self.robot)
+            self.pbclient.removeBody(self.robot)
             del self.robot
-        flags = self.con.URDF_USE_SELF_COLLISION
+        flags = self.pbclient.URDF_USE_SELF_COLLISION
 
         if self.randomize_pose:
             delta_pos = np.random.rand(3) * 0.0
@@ -60,113 +261,132 @@ class Robot:
             delta_pos = np.array([0.0, 0.0, 0.0])
             delta_orientation = pybullet.getQuaternionFromEuler([0, 0, 0])
 
-        self.pos, self.orientation = self.con.multiplyTransforms(
+        self.pos, self.orientation = self.pbclient.multiplyTransforms(
             self.pos, self.orientation, delta_pos, delta_orientation
         )
-        self.robot = self.con.loadURDF(self.robot_urdf_path, self.pos, self.orientation, flags=flags, useFixedBase=True)
-        self.num_joints = self.con.getNumJoints(self.robot)
+        self.robot = self.pbclient.loadURDF(  # TODO: change to PyB_ID, this isn't a robot
+            self.robot_urdf_path, self.pos, self.orientation, flags=flags, useFixedBase=True
+        )
+        self.num_joints = self.pbclient.getNumJoints(self.robot)
+        # get link indices dynamically
 
-        # Get indices dynamically
-        self.tool0_link_index = self.get_link_index(self.tool_link_name)
-        self.end_effector_index = self.get_link_index(self.end_effector_link_name)
-        self.success_link_index = self.get_link_index(self.success_link_name)
-        self.base_index = self.get_link_index(self.base_link_name)
+        # # Setup robot info only once
+        # if not self.joints:
+        #     self.joints = dict()
+        #     self.controllable_joints_idxs = []
+        #     self.joint_lower_limits = []
+        #     self.joint_upper_limits = []
+        #     self.joint_max_forces = []
+        #     self.joint_max_velocities = []
+        #     self.joint_ranges = []
 
-        self.set_collision_filter()
+        #     for i in range(self.num_joints):
+        #         info = self.pbclient.getJointInfo(self.robot, i)
+        #         jointID = info[0]
+        #         jointName = info[1].decode("utf-8")
+        #         jointType = info[2]
+        #         jointLowerLimit = info[8]
+        #         jointUpperLimit = info[9]
+        #         jointMaxForce = info[10]
+        #         jointMaxVelocity = info[11]
+        #         if self.verbose > 1:
+        #             print("Joint Name: ", jointName, "Joint ID: ", jointID)
 
-        # Setup robot info only once
-        if not self.joints:
-            self.joints = dict()
-            self.controllable_joints_idxs = []
-            self.joint_lower_limits = []
-            self.joint_upper_limits = []
-            self.joint_max_forces = []
-            self.joint_max_velocities = []
-            self.joint_ranges = []
+        #         controllable = True if jointName in self.control_joints else False
+        #         if controllable:
+        #             self.controllable_joints_idxs.append(i)
+        #             self.joint_lower_limits.append(jointLowerLimit)
+        #             self.joint_upper_limits.append(jointUpperLimit)
+        #             self.joint_max_forces.append(jointMaxForce)
+        #             self.joint_max_velocities.append(jointMaxVelocity)
+        #             self.joint_ranges.append(jointUpperLimit - jointLowerLimit)
+        #             if self.verbose > 1:
+        #                 print("Controllable Joint Name: ", jointName, "Joint ID: ", jointID)
 
-            for i in range(self.num_joints):
-                info = self.con.getJointInfo(self.robot, i)
-                jointID = info[0]
-                jointName = info[1].decode("utf-8")
-                jointType = info[2]
-                jointLowerLimit = info[8]
-                jointUpperLimit = info[9]
-                jointMaxForce = info[10]
-                jointMaxVelocity = info[11]
-                if self.verbose > 1:
-                    print("Joint Name: ", jointName, "Joint ID: ", jointID)
+        #         # info = self.joint_info( # TODO: make this into dict, put in robot_conf
+        #         #     jointID,
+        #         #     jointName,
+        #         #     jointType,
+        #         #     jointLowerLimit,
+        #         #     jointUpperLimit,
+        #         #     jointMaxForce,
+        #         #     jointMaxVelocity,
+        #         #     controllable
+        #         # )
+        #         self.robot_conf["joint_info"][jointName] = {
+        #             "id": jointID,
+        #             "type": jointType,
+        #             "lower_limit": jointLowerLimit,
+        #             "upper_limit": jointUpperLimit,
+        #             "max_force": jointMaxForce,
+        #             "max_velocity": jointMaxVelocity,
+        #             "controllable": controllable,
+        #         }
 
-                controllable = True if jointName in self.control_joints else False
-                if controllable:
-                    self.controllable_joints_idxs.append(i)
-                    self.joint_lower_limits.append(jointLowerLimit)
-                    self.joint_upper_limits.append(jointUpperLimit)
-                    self.joint_max_forces.append(jointMaxForce)
-                    self.joint_max_velocities.append(jointMaxVelocity)
-                    self.joint_ranges.append(jointUpperLimit - jointLowerLimit)
-                    if self.verbose > 1:
-                        print("Controllable Joint Name: ", jointName, "Joint ID: ", jointID)
+        #         if self.robot_conf["joint_info"][jointName]["type"] == self.pbclient.JOINT_REVOLUTE:
+        #             self.pbclient.setJointMotorControl2(
+        #                 self.robot,
+        #                 self.robot_conf["joint_info"][jointName]["id"],
+        #                 self.pbclient.VELOCITY_CONTROL,
+        #                 targetVelocity=0,
+        #                 force=0,
+        #             )
+        #         # self.joints[info.name] = info
 
-                info = self.joint_info(
-                    jointID,
-                    jointName,
-                    jointType,
-                    jointLowerLimit,
-                    jointUpperLimit,
-                    jointMaxForce,
-                    jointMaxVelocity,
-                    controllable,
-                )
+        # # import pprint as pp
+        # # pp.pprint(self.robot_conf)
 
-                if info.type == self.con.JOINT_REVOLUTE:
-                    self.con.setJointMotorControl2(
-                        self.robot,
-                        info.id,
-                        self.con.VELOCITY_CONTROL,
-                        targetVelocity=0,
-                        force=0,
-                    )
-                self.joints[info.name] = info
+        # # self.init_pos_ee = self.get_current_pose(self.end_effector_index)
+        # # self.init_pos_base = self.get_current_pose(self.base_index)
+        # # self.init_pos_eebase = self.get_current_pose(self.success_link_index)
+        # # self.action = np.zeros(len(self.init_joint_angles), dtype=np.float32)
+        # self.joint_angles = np.array(self.init_joint_angles).astype(np.float32)
+        # # self.achieved_pos = np.array(self.get_current_pose(self.end_effector_index)[0])
+        # # base_pos, base_or = self.get_current_pose(self.base_index)
+        return
 
-        self.set_joint_angles_no_collision(self.init_joint_angles)
-        self.con.stepSimulation()
+    # def get_link_index(self, link_name):
+    #     num_joints = self.pbclient.getNumJoints(self.robot)
+    #     for i in range(num_joints):
+    #         info = self.pbclient.getJointInfo(self.robot, i)
+    #         child_link_name = info[12].decode('utf-8')
+    #         log.warn(child_link_name)
+    #         self.robot_conf["tf_frames"].update({child_link_name: i})
 
-        self.init_pos_ee = self.get_current_pose(self.end_effector_index)
-        self.init_pos_base = self.get_current_pose(self.base_index)
-        self.init_pos_eebase = self.get_current_pose(self.success_link_index)
-        self.action = np.zeros(len(self.init_joint_angles), dtype=np.float32)
-        self.joint_angles = np.array(self.init_joint_angles).astype(np.float32)
-        self.achieved_pos = np.array(self.get_current_pose(self.end_effector_index)[0])
-        base_pos, base_or = self.get_current_pose(self.base_index)
+    #         if child_link_name == link_name:
+    #             return i # return link index
 
-    def get_link_index(self, link_name):
-        num_joints = self.con.getNumJoints(self.robot)
-        for i in range(num_joints):
-            info = self.con.getJointInfo(self.robot, i)
-            child_link_name = info[12].decode("utf-8")
-            if child_link_name == link_name:
-                return i  # return link index
-
-        base_link_name = self.con.getBodyInfo(self.robot)[0].decode("utf-8")
-        if base_link_name == link_name:
-            return -1  # base link has index of -1
-        raise ValueError(f"Link '{link_name}' not found in the robot URDF.")
+    #     base_link_name = self.pbclient.getBodyInfo(self.robot)[0].decode('utf-8')
+    #     if base_link_name == link_name:
+    #         return -1 #base link has index of -1
+    #     raise ValueError(f"Link '{link_name}' not found in the robot URDF.")
 
     def reset_robot(self):
         if self.robot is None:
             return
-
+        self.init_joint_angles = (
+            -np.pi / 2,
+            -np.pi * 2 / 3,
+            np.pi * 2 / 3,
+            -np.pi,
+            -np.pi / 2,
+            np.pi,
+        )
         self.set_joint_angles_no_collision(self.init_joint_angles)
+        return
 
     def remove_robot(self):
-        self.con.removeBody(self.robot)
+        self.pbclient.removeBody(self.robot)
         self.robot = None
+        return
 
     def set_joint_angles_no_collision(self, joint_angles) -> None:
         assert len(joint_angles) == len(self.control_joints)
         for i, name in enumerate(self.control_joints):
+            # joint = self.robot_conf["joint_info"][name]
             joint = self.joints[name]
-            self.con.resetJointState(self.robot, joint.id, joint_angles[i], targetVelocity=0)
+            self.pbclient.resetJointState(self.robot, joint["id"], joint_angles[i], targetVelocity=0)
+        return
 
     def set_joint_angles(self, joint_angles) -> None:
         """Set joint angles using pybullet motor control"""
@@ -177,20 +397,22 @@ class Robot:
         forces = []
 
         for i, name in enumerate(self.control_joints):
+            # joint = self.robot_conf["joint_info"][name]
             joint = self.joints[name]
             poses.append(joint_angles[i])
-            indexes.append(joint.id)
-            forces.append(joint.maxForce)
+            indexes.append(joint["id"])
+            forces.append(joint["max_force"])
 
-        self.con.setJointMotorControlArray(
+        self.pbclient.setJointMotorControlArray(
             self.robot,
             indexes,
-            self.con.POSITION_CONTROL,
+            self.pbclient.POSITION_CONTROL,
             targetPositions=joint_angles,
             targetVelocities=[0] * len(poses),
             positionGains=[0.05] * len(poses),
             forces=forces,
         )
+        return
 
     def set_joint_velocities(self, joint_velocities) -> None:
         """Set joint velocities using pybullet motor control"""
@@ -202,38 +424,41 @@ class Robot:
         for i, name in enumerate(self.control_joints):
             joint = self.joints[name]
             velocities.append(joint_velocities[i])
-            indexes.append(joint.id)
-            forces.append(joint.maxForce)
+            indexes.append(joint["id"])
+            forces.append(joint["max_force"])
 
-        self.con.setJointMotorControlArray(
+        self.pbclient.setJointMotorControlArray(
             self.robot,
             indexes,
-            controlMode=self.con.VELOCITY_CONTROL,
+            controlMode=self.pbclient.VELOCITY_CONTROL,
             targetVelocities=joint_velocities,
         )
+        return
 
     # TODO: Use proprty decorator for getters?
     def get_joint_velocities(self):
-        j = self.con.getJointStates(self.robot, self.controllable_joints_idxs)
+        j = self.pbclient.getJointStates(self.robot, self.control_joint_idxs)
         joints = tuple((i[1] for i in j))
         return joints  # type: ignore
 
     def get_joint_angles(self):
         """Return joint angles"""
-        print(self.control_joints, self.controllable_joints_idxs)
-        j = self.con.getJointStates(self.robot, self.controllable_joints_idxs)
+        # print(self.robot_conf["control_joints"], self.controllable_joints_idxs)
+        j = self.pbclient.getJointStates(self.robot, self.control_joint_idxs)
         joints = tuple((i[0] for i in j))
         return joints
 
     def get_current_pose(self, index):
         """Returns current pose of the index"""
-        link_state = self.con.getLinkState(self.robot, index, computeForwardKinematics=True)
+        link_state = self.pbclient.getLinkState(self.robot, index, computeForwardKinematics=True)
         position, orientation = link_state[4], link_state[5]
         return position, orientation
 
     def get_current_vel(self, index):
         """Returns current pose of the index."""
-        link_state = self.con.getLinkState(self.robot, index, computeLinkVelocity=True, computeForwardKinematics=True)
+        link_state = self.pbclient.getLinkState(
+            self.robot, index, computeLinkVelocity=True, computeForwardKinematics=True
+        )
         trans, ang = link_state[6], link_state[7]
         return trans, ang
 
@@ -246,12 +471,12 @@ class Robot:
     def calculate_ik(self, position, orientation):
         """Calculates joint angles from end effector position and orientation using inverse kinematics"""
 
-        joint_angles = self.con.calculateInverseKinematics(
+        joint_angles = self.pbclient.calculateInverseKinematics(
             self.robot,
             self.end_effector_index,
             position,
             orientation,
-            jointDamping=[0.01] * len(self.control_joints),
+            jointDamping=[0.01] * len(self.robot_conf["control_joints"]),
             upperLimits=self.joint_upper_limits,
             lowerLimits=self.joint_lower_limits,
             jointRanges=self.joint_ranges,  # , restPoses=self.init_joint_angles
@@ -259,9 +484,9 @@ class Robot:
         return joint_angles
 
     def calculate_jacobian(self):
-        jacobian = self.con.calculateJacobian(
+        jacobian = self.pbclient.calculateJacobian(
             self.robot,
-            self.tool0_link_index,
+            self.tool0_link_idx,
             [0, 0, 0],
             self.get_joint_angles(),
             [0] * len(self.control_joints),
@@ -281,79 +506,99 @@ class Robot:
         """Calculate joint velocities from end effector velocity using damped least squares"""
         jacobian = self.calculate_jacobian()
         identity_matrix = np.eye(jacobian.shape[0])
-        damped_matrix = jacobian @ jacobian.T + (damping_factor ** 2) * identity_matrix
+        damped_matrix = jacobian @ jacobian.T + (damping_factor**2) * identity_matrix
         damped_matrix_inv = np.linalg.inv(damped_matrix)
         dls_inv_jacobian = jacobian.T @ damped_matrix_inv
         joint_velocities = dls_inv_jacobian @ end_effector_velocity
         return joint_velocities, jacobian
 
     # TODO: Make camera a separate class?
-    def create_camera_transform(self, pos, orientation, pan, tilt, xyz_offset) -> np.ndarray:
+    def create_camera_transform(self, world_position, world_orientation, camera: Camera) -> np.ndarray:
         """Create rotation matrix for camera"""
         base_offset_tf = np.identity(4)
-        base_offset_tf[:3, 3] = self.camera_base_offset + xyz_offset
+        base_offset_tf[:3, 3] = camera.xyz_offset
 
         ee_transform = np.identity(4)
-        ee_rot_mat = np.array(self.con.getMatrixFromQuaternion(orientation)).reshape(3, 3)
+        ee_rot_mat = np.array(self.pbclient.getMatrixFromQuaternion(world_orientation)).reshape(3, 3)
+
         ee_transform[:3, :3] = ee_rot_mat
-        ee_transform[:3, 3] = pos
+        ee_transform[:3, 3] = world_position
 
         tilt_tf = np.identity(4)
-        tilt_rot = np.array([[1, 0, 0], [0, np.cos(tilt), -np.sin(tilt)], [0, np.sin(tilt), np.cos(tilt)]])
+        tilt_rot = np.array(
+            [[1, 0, 0], [0, np.cos(camera.tilt), -np.sin(camera.tilt)], [0, np.sin(camera.tilt), np.cos(camera.tilt)]]
+        )
         tilt_tf[:3, :3] = tilt_rot
 
         pan_tf = np.identity(4)
-        pan_rot = np.array([[np.cos(pan), 0, np.sin(pan)], [0, 1, 0], [-np.sin(pan), 0, np.cos(pan)]])
+        pan_rot = np.array(
+            [[np.cos(camera.pan), 0, np.sin(camera.pan)], [0, 1, 0], [-np.sin(camera.pan), 0, np.cos(camera.pan)]]
+        )
         pan_tf[:3, :3] = pan_rot
 
         tf = ee_transform @ pan_tf @ tilt_tf @ base_offset_tf
         return tf
 
     # TODO: Better types for getCameraImage
-    def get_view_mat_at_curr_pose(self, pan, tilt, xyz_offset) -> np.ndarray:
+    def get_view_mat_at_curr_pose(self, camera: Camera | TimeOfFlight) -> np.ndarray:
         """Get view matrix at current pose"""
-        pose, orientation = self.get_current_pose(self.tool0_link_index)
+        # tf_id = camera.tf_id
+        # log.error(camera.tf_frame)
+        # log.error(camera.tf_id)
+        pos, orientation = self.get_current_pose(camera.tf_id)
+        # log.debug(f"{camera.tf_frame} Pose: {pos}, Orientation: {Rotation.from_quat(orientation).as_euler('xyz')}")
 
-        camera_tf = self.create_camera_transform(pose, orientation, pan, tilt, xyz_offset)
+        camera_tf = self.create_camera_transform(pos, orientation, camera)
 
         # Initial vectors
         camera_vector = np.array([0, 0, 1]) @ camera_tf[:3, :3].T  #
         up_vector = np.array([0, 1, 0]) @ camera_tf[:3, :3].T  #
-        # Rotated vectors
-        # print(camera_vector, up_vector)
-        view_matrix = self.con.computeViewMatrix(camera_tf[:3, 3], camera_tf[:3, 3] + 0.1 * camera_vector, up_vector)
+
+        # log.debug(f"cam vec, up vec:\n{camera_vector}, {up_vector}")
+
+        view_matrix = self.pbclient.computeViewMatrix(
+            cameraEyePosition=camera_tf[:3, 3],
+            cameraTargetPosition=camera_tf[:3, 3] + 0.1 * camera_vector,
+            cameraUpVector=up_vector,
+        )
         return view_matrix
 
-    def get_camera_location(self):
-        pose, orientation = self.get_current_pose(self.tool0_link_index)
-        tilt = np.pi / 180 * 8
+    # def get_camera_location(
+    #     self, camera: Camera
+    # ):  # TODO: get transform from dictionary. choose between rgb or tof frames
+    #     pose, orientation = self.get_current_pose(camera.tf_id)
+    #     tilt = camera.tilt
 
-        camera_tf = self.create_camera_transform(pose, orientation, tilt)
-        return camera_tf
+    #     camera_tf = self.create_camera_transform(camera=camera)
+    #     return camera_tf
 
     # Collision checking
 
-    def set_collision_filter(self):
+    def set_collision_filter(self, robot_collision_filter_idxs) -> None:
         """Disable collision between pruner and arm"""
-        for i in self.robot_collision_filter_idxs:
-            self.con.setCollisionFilterPair(self.robot, self.robot, i[0], i[1], 0)
+        for i in robot_collision_filter_idxs:
+            self.pbclient.setCollisionFilterPair(self.robot, self.robot, i[0], i[1], 0)
+        return
 
     def unset_collision_filter(self):
         """Enable collision between pruner and arm"""
         for i in self.robot_collision_filter_idxs:
-            self.con.setCollisionFilterPair(self.robot, self.robot, i[0], i[1], 1)
+            self.pbclient.setCollisionFilterPair(self.robot, self.robot, i[0], i[1], 1)
+        return
 
     def disable_self_collision(self):
         for i in range(self.num_joints):
             for j in range(self.num_joints):
                 if i != j:
-                    self.con.setCollisionFilterPair(self.robot, self.robot, i, j, 0)
+                    self.pbclient.setCollisionFilterPair(self.robot, self.robot, i, j, 0)
+        return
 
     def enable_self_collision(self):
         for i in range(self.num_joints):
             for j in range(self.num_joints):
                 if i != j:
-                    self.con.setCollisionFilterPair(self.robot, self.robot, i, j, 1)
+                    self.pbclient.setCollisionFilterPair(self.robot, self.robot, i, j, 1)
+        return
 
     def check_collisions(self, collision_objects) -> Tuple[bool, dict]:
         """Check if there are any collisions between the robot and the environment
@@ -364,7 +609,7 @@ class Robot:
         collision_acceptable_list = ["SPUR", "WATER_BRANCH"]
         collision_unacceptable_list = ["TRUNK", "BRANCH", "SUPPORT"]
         for type in collision_acceptable_list:
-            collisions_acceptable = self.con.getContactPoints(bodyA=self.robot, bodyB=collision_objects[type])
+            collisions_acceptable = self.pbclient.getContactPoints(bodyA=self.robot, bodyB=collision_objects[type])
             if collisions_acceptable:
                 for i in range(len(collisions_acceptable)):
                     if collisions_acceptable[i][-6] < 0:
@@ -374,7 +619,7 @@ class Robot:
                 break
 
         for type in collision_unacceptable_list:
-            collisions_unacceptable = self.con.getContactPoints(bodyA=self.robot, bodyB=collision_objects[type])
+            collisions_unacceptable = self.pbclient.getContactPoints(bodyA=self.robot, bodyB=collision_objects[type])
             for i in range(len(collisions_unacceptable)):
                 if collisions_unacceptable[i][-6] < 0:
                     collision_info["collisions_unacceptable"] = True
@@ -383,7 +628,7 @@ class Robot:
                 break
 
         if not collision_info["collisions_unacceptable"]:
-            collisons_self = self.con.getContactPoints(bodyA=self.robot, bodyB=self.robot)
+            collisons_self = self.pbclient.getContactPoints(bodyA=self.robot, bodyB=self.robot)
             collisions_unacceptable = collisons_self
             for i in range(len(collisions_unacceptable)):
                 if collisions_unacceptable[i][-6] < -0.001:
@@ -401,7 +646,7 @@ class Robot:
         """Check if there are any collisions between the robot and the environment
         Returns: Boolw
         """
-        collisions_success = self.con.getContactPoints(
+        collisions_success = self.pbclient.getContactPoints(
             bodyA=self.robot, bodyB=body_b, linkIndexA=self.success_link_index
         )
         for i in range(len(collisions_success)):
@@ -415,9 +660,33 @@ class Robot:
     def set_collision_filter_tree(self, collision_objects):
         for i in collision_objects.values():
             for j in range(self.num_joints):
-                self.con.setCollisionFilterPair(self.robot, i, j, 0, 0)
+                self.pbclient.setCollisionFilterPair(self.robot, i, j, 0, 0)
+        return
 
     def unset_collision_filter_tree(self, collision_objects):
         for i in collision_objects.values():
             for j in range(self.num_joints):
-                self.con.setCollisionFilterPair(self.robot, i, j, 0, 1)
+                self.pbclient.setCollisionFilterPair(self.robot, i, j, 0, 1)
+        return
+
+
+def main():
+    from pybullet_tree_sim.utils.pyb_utils import PyBUtils
+    import time
+
+    pbutils = PyBUtils(renders=True)
+
+    robot = Robot(
+        pbclient=pbutils.pbclient,
+        # robot_type="ur5e",
+        # base_link_type="linear_slider",
+        # end_effector_type="mock_pruner",
+    )
+
+    time.sleep(10)
+
+    return
+
+
+if __name__ == "__main__":
+    main()

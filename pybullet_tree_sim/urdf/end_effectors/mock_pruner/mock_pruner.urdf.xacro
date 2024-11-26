@@ -3,36 +3,32 @@
 
     <!-- World link -->
     <link name="world" />
+
     
     <!-- Args -->
-    <xacro:arg name="eef_parent" default="world" />
-    <xacro:arg name="eef_prefix" default="mock_pruner__" />
-    
+    <xacro:arg name="mock_pruner_parent_link" default="world" />
+    <xacro:arg name="mock_pruner_prefix" default="mock_pruner__" />
+    <xacro:arg name="mesh_base_path" default="" />    
+    <xacro:arg name="tof0_offset_x" default="0.02" />
+    <xacro:arg name="tof1_offset_x" default="-0.02" />
+
     <!-- mock_pruner macro -->
     <xacro:include filename="./macro/mock_pruner_macro.urdf.xacro" />
-    
-    <!-- <xacro:arg name="parent" default="world" />
-    <xacro:arg name="prefix" default="''" />
-    <xacro:arg name="use_mock_hardware" default="false" />
-    <xacro:arg name="mock_sensor_commands" default="false" />
-    <xacro:arg name="sim_gazebo" default="false" />
-    <xacro:arg name="sim_gazebo_classic" default="false"/> -->
-    
+
     <xacro:mock_pruner_macro
-        eef_prefix="$(arg eef_prefix)"
-        eef_parent="$(arg eef_parent)"
-        tof0_offset='0.02'
-        tof1_offset='-0.02'
-        camera_offset='' 
+        parent_link="$(arg mock_pruner_parent_link)"
+        eef_prefix="$(arg mock_pruner_prefix)"
+        tof0_offset='$(arg tof0_offset_x)'
+        tof1_offset='$(arg tof1_offset_x)'
+        mesh_base_path="$(arg mesh_base_path)"
+        camera_offset=''
     />
-    
-    <joint name="world__$(arg eef_prefix)base" type="fixed">
+
+    <joint name="world--$(arg mock_pruner_prefix)base" type="fixed">
         <origin xyz="0.0 180.0 0.0" rpy="0 0 0"/>
         <parent link="world" />
-        <child link="$(arg eef_prefix)base" />
+        <child link="$(arg mock_pruner_prefix)base" />
     </joint>
-        
+
 
 </robot>
-
-

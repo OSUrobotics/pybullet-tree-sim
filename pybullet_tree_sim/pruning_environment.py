@@ -1,17 +1,20 @@
 #!/usr/bin/env python3
 from pybullet_tree_sim import CONFIG_PATH, MESHES_PATH, URDF_PATH, RGB_LABEL, ROBOT_URDF_PATH
+from pybullet_tree_sim.robot import Robot
 from pybullet_tree_sim.tree import Tree, TreeException
-from pybullet_tree_sim.utils.ur5_utils import UR5
+
+# from pybullet_tree_sim.utils.ur5_utils import UR5
 from pybullet_tree_sim.utils.pyb_utils import PyBUtils
 import pybullet_tree_sim.utils.xacro_utils as xutils
 import pybullet_tree_sim.utils.yaml_utils as yutils
+
+from pybullet_tree_sim import plot
 
 # from final_approach_controller.cut_point_rotate_axis_controller import CutPointRotateAxisController
 
 
 from collections import defaultdict
 import cv2
-import glob
 import gymnasium as gym
 import numpy as np
 import os
@@ -27,6 +30,7 @@ import modern_robotics as mr
 from numpy.typing import ArrayLike
 
 from zenlog import log
+import pprint as pp
 
 
 class PruningEnvException(Exception):
@@ -54,26 +58,21 @@ class PruningEnv(gym.Env):
 
     def __init__(
         self,
-        # angle_threshold_perp: float = 0.52,
-        # angle_threshold_point: float = 0.52,
         pbutils: PyBUtils,
-        # cam_width: int = 424,
-        # cam_height: int = 240,
-        evaluate: bool = False,
-        # distance_threshold: float = 0.05,
-        max_steps: int = 1000,
+        # max_steps: int = 1000,
         make_trees: bool = False,
         name: str = "PruningEnv",
-        num_trees: int | None = None,
+        # num_trees: int | None = None,
         renders: bool = False,
         tree_count: int = 10,
         # tree_urdf_path: str | None = None,
         # tree_obj_path: str | None = None,
         verbose: bool = True,
-        load_robot: bool = True,
-        robot_type: str = "ur5",
-        robot_pos: ArrayLike = np.array([0, 0, 0]),
-        robot_orientation: ArrayLike = np.array([0, 0, 0, 1]),
+        # load_robot: bool = True,
+        # robots: dict = {},
+        # robot_type: str = "ur5",
+        # robot_pos: ArrayLike = np.array([0, 0, 0]),
+        # robot_orientation: ArrayLike = np.array([0, 0, 0, 1]),
         # use_ik: bool = True,
         #
     ) -> None:
@@ -81,13 +80,7 @@ class PruningEnv(gym.Env):
 
         Parameters
         ----------
-            cam_width (int): Pixel width of the camera
-            cam_height (int): Pixel height of the camera
-            evaluate (bool): Is this environment for evaluation
-            max_steps (int): Maximum number of steps in a single run
-            name (str): Name of the environment (default="PruningEnv")
-            renders (bool): Whether to render the environment
-            tree_count (int): Number of trees to be loaded
+            ...
         """
         super().__init__()
         self.pbutils = pbutils
@@ -95,33 +88,15 @@ class PruningEnv(gym.Env):
         # Pybullet GUI variables
         self.render_mode = "rgb_array"
         self.renders = renders
-        self.eval = evaluate
+        # self.eval = evaluate
 
         # Gym variables
         self.name = name
-        self.step_counter = 0
-        self.global_step_counter = 0
+        # self.step_counter = 0
+        # self.global_step_counter = 0
         # self.max_steps = max_steps
         self.tree_count = tree_count
-        self.is_goal_state = False
-
-        # sensor types
-        self.sensor_attributes = {}  # TODO: Load sensor types from config files
-        camera_configs_path = os.path.join(CONFIG_PATH, "camera")
-        camera_configs_files = glob.glob(os.path.join(camera_configs_path, "*.yaml"))
-        for file in camera_configs_files:
-            yamlcontent = yutils.load_yaml(file)
-            for key, value in yamlcontent.items():
-                self.sensor_attributes[key] = value
-
-        tof_configs_path = os.path.join(CONFIG_PATH, "tof")
-        tof_configs_files = glob.glob(os.path.join(tof_configs_path, "*.yaml"))
-        for file in tof_configs_files:
-            yamlcontent = yutils.load_yaml(file)
-            for key, value in yamlcontent.items():
-                self.sensor_attributes[key] = value
-
-        # log.warning(self.sensor_attributes)
+        # self.is_goal_state = False
 
         # self.cam_width = cam_width
         # self.cam_height = cam_height
@@ -148,42 +123,34 @@ class PruningEnv(gym.Env):
             "SUPPORT": None,
         }
 
-        # Tree parameters
-        # self.tree_goal_pos = None
-        # self.tree_goal_or = None
-        # self.tree_goal_normal = None
-        # self.tree_urdf_path: str | None = None
-        # self.tree_pos = np.zeros(3, dtype=float)
-        # self.tree_orientation = np.zeros(3, dtype=float)
-        # self.tree_scale: float = 1.0
-
         self.trees = {}
         self.debouce_time = 0.5
         self.last_button_push_time = time.time()
 
-        # UR5 Robot
-        if load_robot:
-            self.ur5 = self.load_robot(
-                type=robot_type, robot_pos=robot_pos, robot_orientation=robot_orientation, randomize_pose=False
-            )
+        # Load Robots
+        # self.robots = robots
+
+        # if load_robot:
+        #     self.robot = Robot(pbclient=self.pbutils.pbclient)
+        # self.ur5 = self.load_robot(
+        #     type=robot_type, robot_pos=robot_pos, robot_orientation=robot_orientation, randomize_pose=False
+        # )
+
+        # log.warn(self.robots['pruning_robot'].sensors)
+        # self.sensor_config = sensor_config
+        # log.warning(self.sensor_attributes)
         return
 
-    def load_robot(self, type: str, robot_pos: ArrayLike, robot_orientation: ArrayLike, randomize_pose: bool = False):
-        """Load a robot into the environment. Currently only UR5 is supported. TODO: Add Panda"""
-        type = type.strip().lower()
-        if type == "ur5":
-            log.info("Loading UR5 Robot")
-            robot = UR5(
-                con=self.pbutils.pbclient,
-                robot_urdf_path=ROBOT_URDF_PATH,
-                pos=robot_pos,
-                orientation=robot_orientation,
-                randomize_pose=randomize_pose,
-                verbose=self.verbose,
-            )
-        else:
-            raise NotImplementedError(f"Robot type {type} not implemented")
-        return robot
+    # def load_robot(self, type: str, robot_pos: ArrayLike, robot_orientation: ArrayLike, randomize_pose: bool = False):
+    #     """Load a robot into the environment. Currently only UR5 is supported. TODO: Add Panda"""
+    #     type = type.strip().lower()
+    #     if type == "ur5":
+    #         log.info("Loading UR5 Robot")
+    #         robot = Robot(pbclient=self.pbutils.pbclient)
+
+    #     else:
+    #         raise NotImplementedError(f"Robot type {type} not implemented")
+    #     return robot
 
     def load_tree(  # TODO: Clean up Tree init vs create_tree, probably not needed. Too many file checks.
         self,
@@ -205,7 +172,7 @@ class PruningEnv(gym.Env):
         if tree_urdf_path is not None:
             if not os.path.exists(tree_urdf_path):
                 raise OSError(
-                    f"There do not seem to be any files of that name, please check your path. Given path was {tree_urdf_path}"
+                    f"There do not seem to be any files of that name, please check your path: {tree_urdf_path}"
                 )
 
         # Get tree object
@@ -319,10 +286,10 @@ class PruningEnv(gym.Env):
         @param shape (str): shape type. Currently supported options are: [cylinder]
         @param position (ArrayLike): Vector containing the xyz position of the base. Cylinder default position is the center of the cylinder.
         @param orientation (ArrayLike): Vector containing the roll-pitch-yaw of the base about the world origin.
-        @param radius (float, Optional): if
+        @param radius (float, Optional): only valid if shape is "cylinder"
         @return None
         """
-        log.warning(locals())
+        # log.warning(locals())
         shape = shape.strip().lower()
         shape_xacro_path = os.path.join(self._shapes_xacro_dir, shape, f"{shape}.urdf.xacro")
         shape_urdf_path = os.path.join(self._shapes_xacro_dir, shape, f"{shape}.urdf")
@@ -356,7 +323,7 @@ class PruningEnv(gym.Env):
         return
 
     def deproject_pixels_to_points(
-        self, camera, data: np.ndarray, view_matrix: np.ndarray, return_frame: str = "world"
+        self, camera, data: np.ndarray, view_matrix: np.ndarray, return_frame: str = "world", debug=False
     ) -> np.ndarray:
         """Compute frame XYZ from image XY and measured depth. Default frame is 'world'.
         (pixel_coords -- [u,v]) -> (film_coords -- [x,y]) -> (camera_coords -- [X, Y, Z]) -> (world_coords -- [U, V, W])
@@ -373,12 +340,17 @@ class PruningEnv(gym.Env):
         """
 
         # log.debug(f"View matrix:\n{view_matrix}")
+        # log.debug(f"Data\n{data}")
 
         # Flip the y and z axes to convert from OpenGL camera frame to standard camera frame.
         # https://stackoverflow.com/questions/4124041/is-opengl-coordinate-system-left-handed-or-right-handed
         # https://github.com/bitlw/LearnProjMatrix/blob/main/doc/OpenGL_Projection.md#introduction
         # view_matrix[1:3, :] = -view_matrix[1:3, :]
+        #
+
         proj_matrix = np.asarray(camera.depth_proj_mat).reshape([4, 4], order="F")
+        # log.warning(f'{proj_matrix}')
+        # proj_matrix = camera.depth_proj_mat
 
         # rgb, depth = self.pbutils.get_rgbd_at_cur_pose(type='robot', view_matrix=view_matrix)
         # data = depth.reshape((self.cam_width * self.cam_height, 1), order="F")
@@ -394,12 +366,12 @@ class PruningEnv(gym.Env):
         if return_frame.strip().lower() == "camera":
             return cam_coords
 
+        log.warning(f"view_matrix:\n{view_matrix}")
         world_coords = (mr.TransInv(view_matrix) @ cam_coords.T).T
 
-        plot = False
-        if plot:
-            self.debug_plots(
-                camera=camera, data=data, cam_coords=cam_coords, world_coords=world_coords, view_matrix=view_matrix
+        if debug:
+            plot.debug_deproject_pixels_to_points(
+                sensor=camera, data=data, cam_coords=cam_coords, world_coords=world_coords, view_matrix=view_matrix
             )
 
         return world_coords
@@ -411,7 +383,7 @@ class PruningEnv(gym.Env):
         @param cam_coords: nx4 array of camera XYZ coordinates
         @param start_frame: str
         @param end_frame: str (default = 'world')
-        @param view_matrix: 4x4 matrix (world -> camera transform)
+        @param view_matrix: 4x4 matrix (frame -> camera transform)
 
         @return: nx4 array of world XYZ coordinates
         """
@@ -427,6 +399,7 @@ class PruningEnv(gym.Env):
         return end_frame_coords
 
     def compute_deprojected_point_mask(self):
+        point_mask = []
         # TODO: Make this function nicer
         # Function. Be Nice.
         # """Find projection stuff in 'treefitting'. Simpole depth to point mask conversion."""
@@ -465,7 +438,7 @@ class PruningEnv(gym.Env):
         # point_mask = np.expand_dims(point_mask_resize, axis=0).astype(np.float32)
         return point_mask
 
-    def is_reachable(self, vertex: Tuple[np.ndarray], base_xyz: np.ndarray) -> bool:
+    def is_reachable(self, robot: Robot, vertex: Tuple[np.ndarray], base_xyz: np.ndarray) -> bool:
         # if vertex[3] != "SPUR":
         #     return False
         ur5_base_pos = np.array(base_xyz)
@@ -476,7 +449,7 @@ class PruningEnv(gym.Env):
         if dist >= 0.98:  # TODO: is this for the UR5? Should it be from a parameter file?
             return False
 
-        j_angles = self.ur5.calculate_ik(vertex[0], None)
+        j_angles = robot.calculate_ik(vertex[0], None)
         # env.ur5.set_joint_angles(j_angles)
         # for _ in range(100):
         #     pyb.con.stepSimulation()
@@ -506,7 +479,7 @@ class PruningEnv(gym.Env):
             keys_pressed.append(key)
         return keys_pressed
 
-    def get_key_action(self, keys_pressed: list) -> np.ndarray:
+    def get_key_action(self, robot: Robot, keys_pressed: list) -> np.ndarray:
         """Return an action based on the keys pressed."""
         action = np.array([0.0, 0.0, 0, 0.0, 0.0, 0.0])
         if keys_pressed:
@@ -535,53 +508,83 @@ class PruningEnv(gym.Env):
             if ord("f") in keys_pressed:
                 action[5] += -0.05
             if ord("p") in keys_pressed:
+                # Get ToF data
+                data = {}
                 if time.time() - self.last_button_push_time > self.debouce_time:
-                    # Get view and projection matrices
-                    view_matrix = self.ur5.get_view_mat_at_curr_pose(pan=0, tilt=0, xyz_offset=[0, 0, 0])
                     log.warning(f"button p pressed")
-                    rgb, depth = self.pbutils.get_rgbd_at_cur_pose(type="robot", view_matrix=view_matrix)
-                    # log.debug(f'depth:\n{depth}')
-                    depth = -1 * depth.reshape((self.cam_width * self.cam_height, 1), order="F")
-                    world_points = self.deproject_pixels_to_points(
-                        data=depth, view_matrix=np.asarray(view_matrix).reshape([4, 4], order="F")
+                    for name, sensor in robot.sensors.items():
+                        # Get view and projection matrices
+                        if name.startswith("tof"):
+                            log.error(name)
+                            view_matrix = robot.get_view_mat_at_curr_pose(camera=sensor)
+                            # log.error(view_matrix)
+
+                            rgb, depth = self.pbutils.get_rgbd_at_cur_pose(
+                                camera=sensor, type="robot", view_matrix=view_matrix
+                            )
+                            view_matrix = np.asarray(view_matrix).reshape([4, 4], order="F")
+                            depth = depth.reshape((sensor.depth_width * sensor.depth_height, 1), order="F")
+
+                            world_points = self.deproject_pixels_to_points(
+                                camera=sensor, data=depth, view_matrix=view_matrix, return_frame="world", debug=False
+                            )
+
+                            data.update({name: {"data": world_points, "view_matrix": view_matrix, "sensor": sensor}})
+                            self.last_button_push_time = time.time()
+                    plot.debug_sensor_world_data(
+                        data=data,
                     )
-                    # log.debug(f"world_points: {world_points}")
-                    self.last_button_push_time = time.time()
                 else:
                     log.warning("debouce time not yet reached")
             if ord("o") in keys_pressed:
                 pass
             if ord("t") in keys_pressed:
                 # env.force_time_limit()
-                infos = {}
-                infos["TimeLimit.truncated"] = True
-                self.reset_environment()  # TODO: Write
+                # infos = {}
+                # infos["TimeLimit.truncated"] = True
+                # self.reset_environment()  # TODO: Write
                 # set_goal_callback._update_tree_properties()
                 # env.is_goal_state = True
+                pass
 
         else:
-            action = np.array([0.0, 0.0, 0, 0.0, 0.0, 0.0])
+            action = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
             keys_pressed = []
         return action
 
-    def run_sim(self) -> int:
-
-        return 0
-
 
 def main():
-    # data = np.zeros((cam_width, cam_height), dtype=float)
-    # generator = np.random.default_rng(seed=secrets.randbits(128))
-    # data[0,0] = 0.31
-    # data[:, 3:5] = tuple(generator.uniform(0.31, 0.35, (cam_height, 2)))
+    from pybullet_tree_sim.time_of_flight import TimeOfFlight
+    from pybullet_tree_sim.utils.pyb_utils import PyBUtils
+    import numpy as np
+    import secrets
 
-    # start = 0.31
-    # stop = 0.35
-    # data[:, 3:5] = np.array([np.arange(start, stop, (stop - start) / 8), np.arange(start, stop, (stop - start) / 8)]).T
-    # data[-1, 3] = 0.31
-    # data = data.reshape((cam_width * cam_height, 1), order="F")
+    pbutils = PyBUtils(renders=False)
+    penv = PruningEnv(pbutils=pbutils)
+    tof0 = TimeOfFlight(pbclient=pbutils.pbclient, sensor_name="vl53l8cx")
+
+    depth_data = np.zeros((tof0.depth_width, tof0.depth_height), dtype=float)
+    generator = np.random.default_rng(seed=secrets.randbits(128))
+    # data[0,0] = 0.31
+    depth_data[:, :] = tuple(generator.uniform(0.31, 0.35, (tof0.depth_width, tof0.depth_height)))
+
+    start = 0.31
+    stop = 0.35
+    # Depth data IRL comes in as a C-format nx1 array. start with this IRL
+    depth_data[:, 3:5] = np.array(
+        [np.arange(start, stop, (stop - start) / 8), np.arange(start, stop, (stop - start) / 8)]
+    ).T
+    depth_data[-1, 3] = 0.31
+    # Switch to F-format
+    depth_data = depth_data.reshape((tof0.depth_width * tof0.depth_height, 1), order="F")
+
+    view_matrix = np.identity(4)
+    view_matrix[:3, 3] = -1 * np.array([0, 0, 1])
+
+    world_points = penv.deproject_pixels_to_points(camera=tof0, data=depth_data, view_matrix=view_matrix, debug=True)
 
     # log.warning(f"joint angles: {penv.ur5.get_joint_angles()}")
+
     return
 
 

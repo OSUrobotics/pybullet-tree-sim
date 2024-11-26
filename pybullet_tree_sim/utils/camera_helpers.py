@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-from pybullet_tree_sim.utils.pyb_utils import PyBUtils
 from nptyping import NDArray, Shape, Float
 from typing import Union
 import numpy as np
@@ -32,9 +31,10 @@ def get_fov_from_dfov(camera_width: int, camera_height: int, dFoV: Union[int, fl
             raise ValueError(f"Parameter '{key}' cannot be less than 0. Value: {val}")
     if degrees:
         _dfov = np.deg2rad(dFoV)
+        print(_dfov * 180 / np.pi)
     else:
         _dfov = dFoV
-    camera_diag = np.sqrt(camera_width ** 2 + camera_height ** 2)
+    camera_diag = np.sqrt(camera_width**2 + camera_height**2)
     fov_h = 2 * np.arctan(np.tan(_dfov / 2) * camera_height / camera_diag)
     fov_w = 2 * np.arctan(np.tan(_dfov / 2) * camera_width / camera_diag)
     return (np.rad2deg(fov_w), np.rad2deg(fov_h))
