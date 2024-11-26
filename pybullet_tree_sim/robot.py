@@ -140,16 +140,18 @@ class Robot:
         for i in range(self.num_joints):
             info = self.pbclient.getJointInfo(self.robot, i)
             joint_name = info[1].decode("utf-8")
-            joints.update({
-                joint_name: {
-                    "id": i,
-                    'type': info[2],
-                    'lower_limit': info[8],
-                    'upper_limit': info[9],
-                    'max_force': info[10],
-                    'max_velocity': info[11]
+            joints.update(
+                {
+                    joint_name: {
+                        "id": i,
+                        "type": info[2],
+                        "lower_limit": info[8],
+                        "upper_limit": info[9],
+                        "max_force": info[10],
+                        "max_velocity": info[11],
+                    }
                 }
-            })
+            )
         return joints
 
     def _assign_control_joints(self, joints: dict) -> list:
@@ -157,9 +159,9 @@ class Robot:
         control_joints = []
         control_joint_idxs = []
         for joint, joint_info in joints.items():
-            if joint_info['type'] == 0:
+            if joint_info["type"] == 0:
                 control_joints.append(joint)
-                control_joint_idxs.append(joint_info['id'])
+                control_joint_idxs.append(joint_info["id"])
         return control_joints, control_joint_idxs
 
     def _get_links(self) -> dict:
@@ -179,14 +181,21 @@ class Robot:
             if i == 0:
                 continue
             else:
-                if robot_part+'__base' in self.links.keys() and self.robot_conf['robot_stack'][i-1]+'__tool0' in self.links.keys():
-                    robot_collision_filter_idxs.append((self.links[robot_part+'__base'], self.links[self.robot_conf['robot_stack'][i-1]+'__tool0']))
+                if (
+                    robot_part + "__base" in self.links.keys()
+                    and self.robot_conf["robot_stack"][i - 1] + "__tool0" in self.links.keys()
+                ):
+                    robot_collision_filter_idxs.append(
+                        (
+                            self.links[robot_part + "__base"],
+                            self.links[self.robot_conf["robot_stack"][i - 1] + "__tool0"],
+                        )
+                    )
         return robot_collision_filter_idxs
 
     def _get_tool0_link_idx(self):
 
-        return self.links[self.robot_conf['robot_stack'][-1] + '__tool0']
-
+        return self.links[self.robot_conf["robot_stack"][-1] + "__tool0"]
 
     # def _get_sensor_attributes(self) -> dict:
     #     # TODO: refactor to only load required sensors
@@ -215,22 +224,24 @@ class Robot:
             robot_part_runtime_conf_file = os.path.join(robot_part_runtime_conf_path, f"{robot_part}.yaml")
             robot_part_conf = yutils.load_yaml(robot_part_runtime_conf_file)
             if robot_part_conf is None:
-                log.warn(f'Could not load configuration for {robot_part_runtime_conf_file}')
+                log.warn(f"Could not load configuration for {robot_part_runtime_conf_file}")
                 continue
             try:
-                sensor_conf = robot_part_conf['sensors']
+                sensor_conf = robot_part_conf["sensors"]
             except KeyError:
                 log.warn(f"No sensor configuration found for {robot_part} in {robot_part_runtime_conf_file}")
                 continue
             # Create sensors
             for sensor_name, metadata in sensor_conf.items():
-                if metadata['type'] == 'camera':
-                    sensors.update({sensor_name: Camera(pbclient=self.pbclient, sensor_name=metadata['name'])})
-                elif metadata['type'] == 'tof':
-                    sensors.update({sensor_name: TimeOfFlight(pbclient=self.pbclient, sensor_name=metadata['name'])})
+                if metadata["type"] == "camera":
+                    sensors.update({sensor_name: Camera(pbclient=self.pbclient, sensor_name=metadata["name"])})
+                elif metadata["type"] == "tof":
+                    sensors.update({sensor_name: TimeOfFlight(pbclient=self.pbclient, sensor_name=metadata["name"])})
                 # Assign TF frame and pybullet frame id to sensor
-                sensors[sensor_name].tf_frame = robot_part+'__'+metadata['tf_frame'] # TODO: find a better way to get the prefix. If
-                                                                                # from robot_conf, need standard for all robots
+                sensors[sensor_name].tf_frame = (
+                    robot_part + "__" + metadata["tf_frame"]
+                )  # TODO: find a better way to get the prefix. If
+                # from robot_conf, need standard for all robots
                 sensors[sensor_name].tf_id = self.links[sensors[sensor_name].tf_frame]
 
             # for key, value in yamlcontent.items():
@@ -253,12 +264,11 @@ class Robot:
         self.pos, self.orientation = self.pbclient.multiplyTransforms(
             self.pos, self.orientation, delta_pos, delta_orientation
         )
-        self.robot = self.pbclient.loadURDF( # TODO: change to PyB_ID, this isn't a robot
+        self.robot = self.pbclient.loadURDF(  # TODO: change to PyB_ID, this isn't a robot
             self.robot_urdf_path, self.pos, self.orientation, flags=flags, useFixedBase=True
         )
         self.num_joints = self.pbclient.getNumJoints(self.robot)
         # get link indices dynamically
-
 
         # # Setup robot info only once
         # if not self.joints:
@@ -325,8 +335,6 @@ class Robot:
 
         # # import pprint as pp
         # # pp.pprint(self.robot_conf)
-
-
 
         # # self.init_pos_ee = self.get_current_pose(self.end_effector_index)
         # # self.init_pos_base = self.get_current_pose(self.base_index)
@@ -549,9 +557,9 @@ class Robot:
         # log.debug(f"cam vec, up vec:\n{camera_vector}, {up_vector}")
 
         view_matrix = self.pbclient.computeViewMatrix(
-            cameraEyePosition = camera_tf[:3, 3],
-            cameraTargetPosition = camera_tf[:3, 3] + 0.1 * camera_vector,
-            cameraUpVector = up_vector
+            cameraEyePosition=camera_tf[:3, 3],
+            cameraTargetPosition=camera_tf[:3, 3] + 0.1 * camera_vector,
+            cameraUpVector=up_vector,
         )
         return view_matrix
 

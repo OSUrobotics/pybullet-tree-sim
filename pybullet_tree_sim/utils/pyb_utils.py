@@ -154,7 +154,6 @@ class PyBUtils:
                 flags=self.pbclient.ER_NO_SEGMENTATION_MASK,
                 lightDirection=[1, 1, 1],
             )
-        
 
     # def setup_bird_view_visualizer(self):
     #     self.viz_view_matrix = self.pbclient.computeViewMatrixFromYawPitchRoll(
@@ -188,7 +187,7 @@ class PyBUtils:
         @param camera (Camera): Camera object
         @param type (str): either 'robot' or 'viz'
         @param view_matrix (tuple): 16x1 tuple representing the view matrix
-        
+
         @return (rgb, depth) (tuple): RGB and depth images
         """
         # cur_p = self.ur5.get_current_pose(self.camera_link_index)

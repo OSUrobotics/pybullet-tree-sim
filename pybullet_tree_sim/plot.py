@@ -3,22 +3,25 @@ import plotly.graph_objects as go
 import modern_robotics as mr
 from zenlog import log
 import numpy as np
+import pprint as pp
+
 
 def debug_sensor_world_data(data):
+    pp.pprint(data)
     fig = go.Figure()
     for tof_name, tof_data in data.items():
         # log.warn(tof_data)
         fig.add_trace(
             go.Scatter3d(
-                x=tof_data['data'][:, 0],
-                y=tof_data['data'][:, 1],
-                z=tof_data['data'][:, 2],
+                x=tof_data["data"][:, 0],
+                y=tof_data["data"][:, 1],
+                z=tof_data["data"][:, 2],
                 mode="markers",
                 marker=dict(size=2),
                 name=tof_name,
             )
         )
-        inv_view_matrix = mr.TransInv(tof_data['view_matrix'])
+        inv_view_matrix = mr.TransInv(tof_data["view_matrix"])
         fig.add_trace(
             go.Scatter3d(
                 x=[inv_view_matrix[0, 3]],
@@ -29,7 +32,7 @@ def debug_sensor_world_data(data):
                 marker=dict(size=5),
             )
         )
-        
+
         fig.update_layout(
             title=f"World Data",
             scene=dict(
@@ -46,17 +49,12 @@ def debug_sensor_world_data(data):
         )
     fig.show()
     return
-    
 
 
 def debug_deproject_pixels_to_points(sensor, data, cam_coords, world_coords, view_matrix):
 
     hovertemplate = "id: %{id}<br>x: %{x}<br>y: %{y}<br>z: %{z}<extra></extra>"
 
-    # _data = data.reshape([sensor.depth_width, sensor.depth_height], order="F")
-    # _data = _data.reshape((sensor.depth_width * sensor.depth_height, 1), order="C")
-    print(np.array(list(range(8)) * 8).reshape((8, 8), order="C").flatten(order="F"))
-    np.array(list(range(8)) * 8)
     fig = go.Figure(
         data=[
             go.Scatter3d(
@@ -65,9 +63,6 @@ def debug_deproject_pixels_to_points(sensor, data, cam_coords, world_coords, vie
                 # y=np.array([list(range(8))] * 8).T.flatten(order="F"),
                 z=data.flatten(),
                 mode="markers",
-                # ids=np.array([f"{i}" for i in range(sensor.depth_width * sensor.depth_height)])
-                # .reshape((8, 8), order="C")
-                # .flatten(order="F"),
                 ids=[f"{i}" for i in range(sensor.depth_width * sensor.depth_height)],
                 hovertemplate=hovertemplate,
             )
@@ -90,7 +85,7 @@ def debug_deproject_pixels_to_points(sensor, data, cam_coords, world_coords, vie
             go.Scatter3d(
                 x=sensor.depth_film_coords[:, 0],
                 y=sensor.depth_film_coords[:, 1],
-                z= data.flatten(order="F"),
+                z=data.flatten(order="F"),
                 mode="markers",
                 ids=[f"{i}" for i in range(sensor.depth_width * sensor.depth_height)],
                 hovertemplate=hovertemplate,

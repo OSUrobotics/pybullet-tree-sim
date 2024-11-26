@@ -8,14 +8,14 @@ sensors:
         tilt: 0.0
     tof0:
         type: tof
-        name: vl53l8cx
+        name: vl6180
         # x_offset: "0.02"
         tf_frame: "tof0"
         pan: 0.0
         tilt: 0.0
     tof1:
         type: tof
-        name: vl53l8cx
+        name: vl6180
         # x_offset: "-0.02"
         tf_frame: "tof1"
         pan: 0.0

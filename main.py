@@ -15,10 +15,8 @@ from zenlog import log
 
 def main():
     pbutils = PyBUtils(renders=True)
-    
-    robot = Robot(
-        pbclient=pbutils.pbclient, position=[0, 1, 0], orientation=[0, 0, 0, 1]
-    )
+
+    robot = Robot(pbclient=pbutils.pbclient, position=[0, 1, 0], orientation=[0, 0, 0, 1])
 
     penv = PruningEnv(
         pbutils=pbutils,
@@ -26,10 +24,9 @@ def main():
     )
 
     _1_inch = 0.0254
-    penv.activate_shape(shape="cylinder", radius=_1_inch * 2 , height=2.85, orientation=[0, np.pi / 2, 0])
+    penv.activate_shape(shape="cylinder", radius=_1_inch * 2, height=2.85, orientation=[0, np.pi / 2, 0])
     # penv.activate_shape(shape="cylinder", radius=0.01, height=2.85, orientation=[0, np.pi / 2, 0])
-    
-    
+
     # penv.load_tree(
     #     pbutils=pbutils,
     #     scale=1.0,
@@ -48,7 +45,7 @@ def main():
         time.sleep(0.1)
 
     # log.debug(robot.sensors['tof0'].tf_frame)
-    
+
     while True:
         try:
             # log.debug(f"{robot.sensors['tof0']}")
@@ -62,7 +59,7 @@ def main():
             )
             # tof0_view_matrix = np.asarray(tof0_view_matrix).reshape((4, 4), order="F")
             # log.debug(f"{tof0_view_matrix[:3, 3]}")
-            
+
             keys_pressed = penv.get_key_pressed()
             action = penv.get_key_action(robot=robot, keys_pressed=keys_pressed)
             action = action.reshape((6, 1))

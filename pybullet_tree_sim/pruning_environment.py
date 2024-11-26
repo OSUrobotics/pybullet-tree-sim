@@ -346,8 +346,8 @@ class PruningEnv(gym.Env):
         # https://stackoverflow.com/questions/4124041/is-opengl-coordinate-system-left-handed-or-right-handed
         # https://github.com/bitlw/LearnProjMatrix/blob/main/doc/OpenGL_Projection.md#introduction
         # view_matrix[1:3, :] = -view_matrix[1:3, :]
-        # 
-        
+        #
+
         proj_matrix = np.asarray(camera.depth_proj_mat).reshape([4, 4], order="F")
         # log.warning(f'{proj_matrix}')
         # proj_matrix = camera.depth_proj_mat
@@ -358,14 +358,14 @@ class PruningEnv(gym.Env):
         # Get camera intrinsics from projection matrix. If square camera, these should be the same.
         fx = proj_matrix[0, 0]
         fy = proj_matrix[1, 1]  # if square camera, these should be the same
-        
+
         # Get camera coordinates from film-plane coordinates. Scale, add z (depth), then homogenize the matrix.
         cam_coords = np.divide(np.multiply(camera.depth_film_coords, data), [fx, fy])
         cam_coords = np.concatenate((cam_coords, data, np.ones((camera.depth_width * camera.depth_height, 1))), axis=1)
 
         if return_frame.strip().lower() == "camera":
             return cam_coords
-        
+
         log.warning(f"view_matrix:\n{view_matrix}")
         world_coords = (mr.TransInv(view_matrix) @ cam_coords.T).T
 
@@ -514,31 +514,22 @@ class PruningEnv(gym.Env):
                     log.warning(f"button p pressed")
                     for name, sensor in robot.sensors.items():
                         # Get view and projection matrices
-                        if name.startswith('tof'):
+                        if name.startswith("tof"):
                             log.error(name)
                             view_matrix = robot.get_view_mat_at_curr_pose(camera=sensor)
                             # log.error(view_matrix)
-                            
+
                             rgb, depth = self.pbutils.get_rgbd_at_cur_pose(
                                 camera=sensor, type="robot", view_matrix=view_matrix
                             )
-                            view_matrix = np.asarray(view_matrix).reshape([4, 4], order="F")                            
+                            view_matrix = np.asarray(view_matrix).reshape([4, 4], order="F")
                             depth = depth.reshape((sensor.depth_width * sensor.depth_height, 1), order="F")
-                                                        
+
                             world_points = self.deproject_pixels_to_points(
-                                camera=sensor,
-                                data=depth,
-                                view_matrix=view_matrix,
-                                return_frame='world',
-                                debug=False
+                                camera=sensor, data=depth, view_matrix=view_matrix, return_frame="world", debug=False
                             )
-                            
-                            data.update({name: {
-                                    'data': world_points,
-                                    'view_matrix': view_matrix,
-                                    'sensor': sensor
-                                }
-                            })
+
+                            data.update({name: {"data": world_points, "view_matrix": view_matrix, "sensor": sensor}})
                             self.last_button_push_time = time.time()
                     plot.debug_sensor_world_data(
                         data=data,
@@ -557,7 +548,7 @@ class PruningEnv(gym.Env):
                 pass
 
         else:
-            action = np.array([0.0, 0.0, 0, 0.0, 0.0, 0.0])
+            action = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
             keys_pressed = []
         return action
 
@@ -567,7 +558,7 @@ def main():
     from pybullet_tree_sim.utils.pyb_utils import PyBUtils
     import numpy as np
     import secrets
-    
+
     pbutils = PyBUtils(renders=False)
     penv = PruningEnv(pbutils=pbutils)
     tof0 = TimeOfFlight(pbclient=pbutils.pbclient, sensor_name="vl53l8cx")
@@ -577,27 +568,20 @@ def main():
     # data[0,0] = 0.31
     depth_data[:, :] = tuple(generator.uniform(0.31, 0.35, (tof0.depth_width, tof0.depth_height)))
 
-    
     start = 0.31
     stop = 0.35
     # Depth data IRL comes in as a C-format nx1 array. start with this IRL
-    depth_data[:, 3:5] = np.array([np.arange(start, stop, (stop - start) / 8), np.arange(start, stop, (stop - start) / 8)]).T
+    depth_data[:, 3:5] = np.array(
+        [np.arange(start, stop, (stop - start) / 8), np.arange(start, stop, (stop - start) / 8)]
+    ).T
     depth_data[-1, 3] = 0.31
     # Switch to F-format
     depth_data = depth_data.reshape((tof0.depth_width * tof0.depth_height, 1), order="F")
-    
+
     view_matrix = np.identity(4)
-    view_matrix[:3, 3] = -1 * np.array([0,0,1])
-    
-    world_points = penv.deproject_pixels_to_points(
-        camera=tof0,
-        data=depth_data,
-        view_matrix=view_matrix,
-        debug=True
-    )
-    
-    
-    
+    view_matrix[:3, 3] = -1 * np.array([0, 0, 1])
+
+    world_points = penv.deproject_pixels_to_points(camera=tof0, data=depth_data, view_matrix=view_matrix, debug=True)
 
     # log.warning(f"joint angles: {penv.ur5.get_joint_angles()}")
 
