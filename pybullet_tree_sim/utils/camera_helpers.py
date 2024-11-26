@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-from pybullet_tree_sim.utils.pyb_utils import PyBUtils
 from nptyping import NDArray, Shape, Float
 from typing import Union
 import numpy as np
