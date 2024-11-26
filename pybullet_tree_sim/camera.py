@@ -55,6 +55,7 @@ class Camera(Sensor):
 
 def main():
     import pprint as pp
+
     pbutils = PyBUtils(renders=False)
     camera = Camera(pbutils, sensor_name="realsense_d435i")
     pp.pprint(camera.depth_pixel_coords)

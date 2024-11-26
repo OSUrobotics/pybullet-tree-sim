@@ -3,6 +3,7 @@ data_type: "d"
 depth:
     dfov: 25.0
     near_plane: 0.002
-    far_plane: 0.150
+    # far_plane: 0.150
+    far_plane: 0.40
     width: 1
     height: 1
