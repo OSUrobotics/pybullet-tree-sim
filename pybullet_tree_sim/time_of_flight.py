@@ -11,16 +11,16 @@ from zenlog import log
 
 
 class TimeOfFlight(Camera):
-    def __init__(self, pbutils: PyBUtils, sensor_name: str, sensor_type: str = "tof") -> None:
+    def __init__(self, pbclient, sensor_name: str, sensor_type: str = "tof") -> None:
         """Builds a ToF camera object from a base Camera class"""
-        super().__init__(pbutils=pbutils, sensor_name=sensor_name, sensor_type=sensor_type)
+        super().__init__(pbclient=pbclient, sensor_name=sensor_name, sensor_type=sensor_type)
 
         return
 
 
 def main():
     pbutils = PyBUtils(renders=False)
-    tof = TimeOfFlight(pbutils, sensor_name="vl53l8cx")
+    tof = TimeOfFlight(pbutils.pbclient, sensor_name="vl53l8cx")
     print(tof.depth_proj_mat)
 
     return

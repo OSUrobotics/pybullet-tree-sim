@@ -17,8 +17,10 @@ class Sensor:
         @return: None
         """
         sensor_type = sensor_type.strip().lower()
-        self.sensor_path = os.path.join(CONFIG_PATH, sensor_type)
+        self.sensor_path = os.path.join(CONFIG_PATH, "description", sensor_type)
         self.params = self._load_params(sensor_name=sensor_name, sensor_type=sensor_type)
+        self.tf_frame: str
+        self.tf_id: int
         return
 
     def _load_params(self, sensor_name: str, sensor_type) -> dict:
@@ -30,7 +32,7 @@ class Sensor:
         sensor_config_path = os.path.join(self.sensor_path, f"{sensor_name}.yaml")
 
         if os.path.exists(sensor_config_path):
-            log.info(f"Loading sensor configiguration from {sensor_config_path}")
+            log.info(f"Loading sensor configuration from {sensor_config_path}")
             config_content = yutils.load_yaml(sensor_config_path)
             if config_content is not None:
                 return config_content
@@ -47,7 +49,7 @@ def main():
 
     sensor = Sensor(sensor_name="vl53l8cx", sensor_type="tof")
     print(sensor.params)
-    
+
     sensor = Sensor(sensor_name="vl6180", sensor_type="tof")
     print(sensor.params)
 

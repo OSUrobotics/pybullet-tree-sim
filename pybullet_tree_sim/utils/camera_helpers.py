@@ -32,6 +32,7 @@ def get_fov_from_dfov(camera_width: int, camera_height: int, dFoV: Union[int, fl
             raise ValueError(f"Parameter '{key}' cannot be less than 0. Value: {val}")
     if degrees:
         _dfov = np.deg2rad(dFoV)
+        print(_dfov * 180 / np.pi)
     else:
         _dfov = dFoV
     camera_diag = np.sqrt(camera_width ** 2 + camera_height ** 2)

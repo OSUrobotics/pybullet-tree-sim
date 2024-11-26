@@ -13,39 +13,23 @@ import time
 from zenlog import log
 
 
-def main():    
+def main():
     pbutils = PyBUtils(renders=True)
-
-    # Init sensors
-    sensor_config = {
-        "camera0": {
-            'sensor': Camera(pbutils, sensor_name="realsense_d435i"),
-            'tf_frame': "mock_pruner__camera0",
-        },
-        'tof0': {
-            'sensor': TimeOfFlight(pbutils, sensor_name="vl6180"),
-            'tf_frame': "mock_pruner__tof0",
-        },
-        'tof1': {
-            'sensor': TimeOfFlight(pbutils, sensor_name="vl6180"),
-            'tf_frame': "mock_pruner__tof1",
-        }
-    }
     
-    robots = {
-        'pruning_robot': Robot(
-            pbclient=pbutils.pbclient,
-            sensor_config=sensor_config,
-            position = [0, 1, 0],
-            orientation = [0, 0, 0, 1])
-    }
+    robot = Robot(
+        pbclient=pbutils.pbclient, position=[0, 1, 0], orientation=[0, 0, 0, 1]
+    )
 
     penv = PruningEnv(
-        pbutils=pbutils, robots=robots, verbose=True,
+        pbutils=pbutils,
+        verbose=True,
     )
-    
 
-    # penv.activate_shape(shape="cylinder", radius=2 * 0.0254, height=2.0, orientation=[0, np.pi / 2, 0])
+    _1_inch = 0.0254
+    penv.activate_shape(shape="cylinder", radius=_1_inch * 2 , height=2.85, orientation=[0, np.pi / 2, 0])
+    # penv.activate_shape(shape="cylinder", radius=0.01, height=2.85, orientation=[0, np.pi / 2, 0])
+    
+    
     # penv.load_tree(
     #     pbutils=pbutils,
     #     scale=1.0,
@@ -58,18 +42,27 @@ def main():
     # )
     # penv.activate_tree(tree_id_str="LPy_envy_tree1")
 
-    # Run the sim a little just to get the environment properly loaded.
+    # # Run the sim a little just to get the environment properly loaded.
     for i in range(100):
         pbutils.pbclient.stepSimulation()
         time.sleep(0.1)
-        
-    # time.sleep(30)
-    robot = penv.robots['pruning_robot']
-    # Simulation loop
+
+    # log.debug(robot.sensors['tof0'].tf_frame)
+    
     while True:
         try:
-            sensor_view_matrix = robot.get_view_mat_at_curr_pose(camera=robot.sensors['mock_pruner__camera0'])
-            rgbd = penv.pbutils.get_rgbd_at_cur_pose(camera=robot.sensors['mock_pruner__camera0'], type="robot", view_matrix=sensor_view_matrix)
+            # log.debug(f"{robot.sensors['tof0']}")
+            tof0_view_matrix = robot.get_view_mat_at_curr_pose(camera=robot.sensors["tof0"])
+            tof0_rgbd = penv.pbutils.get_rgbd_at_cur_pose(
+                camera=robot.sensors["tof0"], type="robot", view_matrix=tof0_view_matrix
+            )
+            tof1_view_matrix = robot.get_view_mat_at_curr_pose(camera=robot.sensors["tof1"])
+            tof1_rgbd = penv.pbutils.get_rgbd_at_cur_pose(
+                camera=robot.sensors["tof1"], type="robot", view_matrix=tof1_view_matrix
+            )
+            # tof0_view_matrix = np.asarray(tof0_view_matrix).reshape((4, 4), order="F")
+            # log.debug(f"{tof0_view_matrix[:3, 3]}")
+            
             keys_pressed = penv.get_key_pressed()
             action = penv.get_key_action(robot=robot, keys_pressed=keys_pressed)
             action = action.reshape((6, 1))
@@ -81,8 +74,8 @@ def main():
         except KeyboardInterrupt:
             break
 
-    # penv.deactivate_tree(tree_id_str="LPy_tree1")
-    penv.pbutils.pbclient.disconnect()
+    # # penv.deactivate_tree(tree_id_str="LPy_tree1")
+    # penv.pbutils.pbclient.disconnect()
     return
 
 
