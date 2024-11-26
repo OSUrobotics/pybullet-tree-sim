@@ -424,11 +424,15 @@ class UR5:
         ee_transform[:3, 3] = world_position
 
         tilt_tf = np.identity(4)
-        tilt_rot = np.array([[1, 0, 0], [0, np.cos(camera.tilt), -np.sin(camera.tilt)], [0, np.sin(camera.tilt), np.cos(camera.tilt)]])
+        tilt_rot = np.array(
+            [[1, 0, 0], [0, np.cos(camera.tilt), -np.sin(camera.tilt)], [0, np.sin(camera.tilt), np.cos(camera.tilt)]]
+        )
         tilt_tf[:3, :3] = tilt_rot
 
         pan_tf = np.identity(4)
-        pan_rot = np.array([[np.cos(camera.pan), 0, np.sin(camera.pan)], [0, 1, 0], [-np.sin(camera.pan), 0, np.cos(camera.pan)]])
+        pan_rot = np.array(
+            [[np.cos(camera.pan), 0, np.sin(camera.pan)], [0, 1, 0], [-np.sin(camera.pan), 0, np.cos(camera.pan)]]
+        )
         pan_tf[:3, :3] = pan_rot
 
         tf = ee_transform @ pan_tf @ tilt_tf @ base_offset_tf

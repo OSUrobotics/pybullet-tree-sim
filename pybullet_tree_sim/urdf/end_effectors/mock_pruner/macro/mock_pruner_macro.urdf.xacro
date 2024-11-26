@@ -11,11 +11,19 @@
     <xacro:macro name="mock_pruner_macro" params="parent_link eef_prefix tof0_offset tof1_offset camera_offset mesh_base_path urdf_base_path">
         <!-- static properties -->
         <xacro:property name="mock_pruner_mass" value="2.0" />
+        <xacro:property name="base__tool0_offset" value="0.0 0.0 0.27208"/>
+        <xacro:property name="base__tof0_offset" value="${tof0_offset} 0 0.142"/>
+        <xacro:property name="base__tof1_offset" value="${tof1_offset} 0 0.142"/>
+        
+        <!-- <xacro:property name="base__tof0_offset" value="${tof0_offset} 0 0.15"/> -->
+        <!-- <xacro:property name="base__tof1_offset" value="${tof1_offset} 0 0.15"/> -->
+        <xacro:property name="base__camera0_offset" value="0.0 0.0600 0.19094"/>
+        
         
         <!-- additional args -->
         <xacro:arg name="dovetail_male_mount_prefix" default="dovetail_male_mount__" />
         <xacro:arg name="dovetail_female_mount_prefix" default="dovetail_female_mount__" />
-        <xacro:arg name="mesh_base_path" default="" />
+        <xacro:arg name="mesh_base_path" default=""/>
         <xacro:arg name="urdf_base_path" default=""/>
         
         <!-- dovetail_mount macro -->
@@ -77,25 +85,25 @@
         </joint>
         
         <joint name="${eef_prefix}base--camera0" type="fixed">
-            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <origin xyz="${base__camera0_offset}" rpy="0 0 0"/>
             <parent link="${eef_prefix}base" />
             <child link="${eef_prefix}camera0" />
         </joint>
         
         <joint name="${eef_prefix}base--tof0" type="fixed">
             <!-- <xacro:insert_block name="origin"/> -->
-            <origin xyz="${tof0_offset} 0 0" rpy="0 0 0"/>
+            <origin xyz="${base__tof0_offset}" rpy="0 0 0"/>
             <parent link="${eef_prefix}base" />
             <child link="${eef_prefix}tof0" />
         </joint>
         <joint name="${eef_prefix}base--tof1" type="fixed">
-            <origin xyz="${tof1_offset} 0 0" rpy="0 0 0"/>
+            <origin xyz="${base__tof1_offset}" rpy="0 0 0"/>
             <parent link="${eef_prefix}base" />
             <child link="${eef_prefix}tof1" />
         </joint>
         
         <joint name="${eef_prefix}base--tool0" type="fixed">
-            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <origin xyz="${base__tool0_offset}" rpy="0 0 0"/>
             <parent link="${eef_prefix}base" />
             <child link="${eef_prefix}tool0" />
         </joint>

@@ -145,23 +145,23 @@
 		<child link="mock_pruner__base"/>
 	</joint>
 	<joint name="mock_pruner__base--camera0" type="fixed">
-		<origin rpy="0 0 0" xyz="0 0 0"/>
+		<origin rpy="0 0 0" xyz="0.0 0.0600 0.19094"/>
 		<parent link="mock_pruner__base"/>
 		<child link="mock_pruner__camera0"/>
 	</joint>
 	<joint name="mock_pruner__base--tof0" type="fixed">
 		<!-- <xacro:insert_block name="origin"/> -->
-		<origin rpy="0 0 0" xyz="0.02 0 0"/>
+		<origin rpy="0 0 0" xyz="0.1 0 0.142"/>
 		<parent link="mock_pruner__base"/>
 		<child link="mock_pruner__tof0"/>
 	</joint>
 	<joint name="mock_pruner__base--tof1" type="fixed">
-		<origin rpy="0 0 0" xyz="-0.02 0 0"/>
+		<origin rpy="0 0 0" xyz="-0.1 0 0.142"/>
 		<parent link="mock_pruner__base"/>
 		<child link="mock_pruner__tof1"/>
 	</joint>
 	<joint name="mock_pruner__base--tool0" type="fixed">
-		<origin rpy="0 0 0" xyz="0 0 0"/>
+		<origin rpy="0 0 0" xyz="0.0 0.0 0.27208"/>
 		<parent link="mock_pruner__base"/>
 		<child link="mock_pruner__tool0"/>
 	</joint>
