@@ -356,7 +356,7 @@ class Tree:
 
         self.projection_mean = self.projection_sum_x / len(self.vertex_and_projection)
         self.projection_std = np.sqrt(
-            self.projection_sum_x2 / len(self.vertex_and_projection) - self.projection_mean ** 2
+            self.projection_sum_x2 / len(self.vertex_and_projection) - self.projection_mean**2
         )
         return
 

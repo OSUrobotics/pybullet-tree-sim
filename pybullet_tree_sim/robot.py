@@ -506,7 +506,7 @@ class Robot:
         """Calculate joint velocities from end effector velocity using damped least squares"""
         jacobian = self.calculate_jacobian()
         identity_matrix = np.eye(jacobian.shape[0])
-        damped_matrix = jacobian @ jacobian.T + (damping_factor ** 2) * identity_matrix
+        damped_matrix = jacobian @ jacobian.T + (damping_factor**2) * identity_matrix
         damped_matrix_inv = np.linalg.inv(damped_matrix)
         dls_inv_jacobian = jacobian.T @ damped_matrix_inv
         joint_velocities = dls_inv_jacobian @ end_effector_velocity
