@@ -1,0 +1,22 @@
+sensors:
+    camera0:
+        type: camera
+        name: realsense_d435i
+        # x_offset: "0.02"
+        tf_frame: "camera0"
+        pan: 0.0
+        tilt: 0.0
+    tof0:
+        type: tof
+        name: vl6180
+        # x_offset: "0.02"
+        tf_frame: "tof0"
+        pan: 0.0
+        tilt: 0.0
+    tof1:
+        type: tof
+        name: vl6180
+        # x_offset: "-0.02"
+        tf_frame: "tof1"
+        pan: 0.0
+        tilt: 0.0
