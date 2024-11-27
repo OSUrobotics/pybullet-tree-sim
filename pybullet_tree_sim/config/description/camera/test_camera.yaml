@@ -1,0 +1,16 @@
+name: "Test Camera"
+data_type: "rgbd"
+rgb:
+    width: 800  
+    height: 600  
+    hfov: 70  
+    vfov: 45  
+    fps: 30  
+depth:
+    width: 800  
+    height: 600  
+    hfov: 88  
+    vfov: 60  
+    fps: 30  
+    near_plane: 0.1  
+    far_plane: 15.0
