@@ -60,21 +60,12 @@ class PruningEnv(gym.Env):
         self,
         pbutils: PyBUtils,
         # max_steps: int = 1000,
-        make_trees: bool = False,
+        # make_trees: bool = False,
         name: str = "PruningEnv",
         # num_trees: int | None = None,
         renders: bool = False,
-        tree_count: int = 10,
-        # tree_urdf_path: str | None = None,
-        # tree_obj_path: str | None = None,
+        
         verbose: bool = True,
-        # load_robot: bool = True,
-        # robots: dict = {},
-        # robot_type: str = "ur5",
-        # robot_pos: ArrayLike = np.array([0, 0, 0]),
-        # robot_orientation: ArrayLike = np.array([0, 0, 0, 1]),
-        # use_ik: bool = True,
-        #
     ) -> None:
         """Initialize the Pruning Environment
 
@@ -92,30 +83,14 @@ class PruningEnv(gym.Env):
 
         # Gym variables
         self.name = name
-        # self.step_counter = 0
-        # self.global_step_counter = 0
+        self.step_counter = 0
+        self.global_step_counter = 0
         # self.max_steps = max_steps
-        self.tree_count = tree_count
-        # self.is_goal_state = False
 
-        # self.cam_width = cam_width
-        # self.cam_height = cam_height
-        # self.cam_pan = 0
-        # self.cam_tilt = 0
-        # # self.cam_xyz_offset = np.zeros(3)
-        # self.cam_xyz_offset = np.array([0, 0, 0])
-
-        # # Camera stuff
-        # self.pixel_coords = np.array(list(np.ndindex((cam_width, cam_height))), dtype=int)  # C-style
-        # # Find the pixel coordinates in the film plane. Bin, offset, normalize, then scale to [-1, 1]
-        # self.film_plane_coords = np.zeros((cam_width, cam_height, 2), dtype=float)
-        # self.film_plane_coords = 2 * np.divide(
-        #     np.subtract(np.add(self.pixel_coords, [0.5, 0.5]), [cam_width / 2, cam_height / 2]), [cam_width, cam_height]
-        # )
 
         self.verbose = verbose
 
-        self.collision_object_ids = {
+        self.collision_object_ids = { # TODO: move to tree.py
             "SPUR": None,
             "TRUNK": None,
             "BRANCH": None,
@@ -126,31 +101,9 @@ class PruningEnv(gym.Env):
         self.trees = {}
         self.debouce_time = 0.5
         self.last_button_push_time = time.time()
-
-        # Load Robots
-        # self.robots = robots
-
-        # if load_robot:
-        #     self.robot = Robot(pbclient=self.pbutils.pbclient)
-        # self.ur5 = self.load_robot(
-        #     type=robot_type, robot_pos=robot_pos, robot_orientation=robot_orientation, randomize_pose=False
-        # )
-
-        # log.warn(self.robots['pruning_robot'].sensors)
-        # self.sensor_config = sensor_config
-        # log.warning(self.sensor_attributes)
         return
 
-    # def load_robot(self, type: str, robot_pos: ArrayLike, robot_orientation: ArrayLike, randomize_pose: bool = False):
-    #     """Load a robot into the environment. Currently only UR5 is supported. TODO: Add Panda"""
-    #     type = type.strip().lower()
-    #     if type == "ur5":
-    #         log.info("Loading UR5 Robot")
-    #         robot = Robot(pbclient=self.pbutils.pbclient)
 
-    #     else:
-    #         raise NotImplementedError(f"Robot type {type} not implemented")
-    #     return robot
 
     def load_tree(  # TODO: Clean up Tree init vs create_tree, probably not needed. Too many file checks.
         self,
@@ -481,7 +434,7 @@ class PruningEnv(gym.Env):
 
     def get_key_action(self, robot: Robot, keys_pressed: list) -> np.ndarray:
         """Return an action based on the keys pressed."""
-        action = np.array([0.0, 0.0, 0, 0.0, 0.0, 0.0])
+        action = np.zeros(6, dtype=float)
         if keys_pressed:
             if ord("a") in keys_pressed:
                 action[0] += 0.01
@@ -507,50 +460,17 @@ class PruningEnv(gym.Env):
                 action[5] += 0.05
             if ord("f") in keys_pressed:
                 action[5] += -0.05
-            if ord("p") in keys_pressed:
-                # Get ToF data
-                data = {}
-                if time.time() - self.last_button_push_time > self.debouce_time:
-                    log.warning(f"button p pressed")
-                    for name, sensor in robot.sensors.items():
-                        # Get view and projection matrices
-                        if name.startswith("tof"):
-                            log.error(name)
-                            view_matrix = robot.get_view_mat_at_curr_pose(camera=sensor)
-                            # log.error(view_matrix)
-
-                            rgb, depth = self.pbutils.get_rgbd_at_cur_pose(
-                                camera=sensor, type="robot", view_matrix=view_matrix
-                            )
-                            view_matrix = np.asarray(view_matrix).reshape([4, 4], order="F")
-                            depth = depth.reshape((sensor.depth_width * sensor.depth_height, 1), order="F")
-
-                            world_points = self.deproject_pixels_to_points(
-                                camera=sensor, data=depth, view_matrix=view_matrix, return_frame="world", debug=False
-                            )
-
-                            data.update({name: {"data": world_points, "view_matrix": view_matrix, "sensor": sensor}})
-                            self.last_button_push_time = time.time()
-                    plot.debug_sensor_world_data(
-                        data=data,
-                    )
-                else:
-                    log.warning("debouce time not yet reached")
             if ord("o") in keys_pressed:
-                pass
-            if ord("t") in keys_pressed:
-                # env.force_time_limit()
-                # infos = {}
-                # infos["TimeLimit.truncated"] = True
-                # self.reset_environment()  # TODO: Write
-                # set_goal_callback._update_tree_properties()
-                # env.is_goal_state = True
                 pass
 
         else:
             action = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
             keys_pressed = []
         return action
+        
+    def get_robot_teleop() -> np.ndarray:
+        
+        return
 
 
 def main():
@@ -564,9 +484,9 @@ def main():
     tof0 = TimeOfFlight(pbclient=pbutils.pbclient, sensor_name="vl53l8cx")
 
     depth_data = np.zeros((tof0.depth_width, tof0.depth_height), dtype=float)
-    generator = np.random.default_rng(seed=secrets.randbits(128))
+    # generator = np.random.default_rng(seed=secrets.randbits(128))
     # data[0,0] = 0.31
-    depth_data[:, :] = tuple(generator.uniform(0.31, 0.35, (tof0.depth_width, tof0.depth_height)))
+    # depth_data[:, :] = tuple(generator.uniform(0.31, 0.35, (tof0.depth_width, tof0.depth_height)))
 
     start = 0.31
     stop = 0.35
@@ -581,7 +501,7 @@ def main():
     view_matrix = np.identity(4)
     view_matrix[:3, 3] = -1 * np.array([0, 0, 1])
 
-    world_points = penv.deproject_pixels_to_points(camera=tof0, data=depth_data, view_matrix=view_matrix, debug=True)
+    world_points = robot.deproject_pixels_to_points(camera=tof0, data=depth_data, view_matrix=view_matrix, debug=True)
 
     # log.warning(f"joint angles: {penv.ur5.get_joint_angles()}")
 

@@ -3,7 +3,7 @@ urdf generic launch CLI test:
 
 ## TODO
 1. For Claire: 
-    1. Generic URDF to Generic Robot class
+    1. Figure out best way to manage tree/robot/environment interaction. I removed robot from penv, but self.trees still exists. 
     1. Fill out the `object_loader.py` class. Activate/deactivate trees, supports, robots.
 1. Format the final approach controller as a python subpackage?
     1. https://packaging.python.org/en/latest/guides/packaging-namespace-packages/#packaging-namespace-packages

@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 from pybullet_tree_sim.camera import Camera
 from pybullet_tree_sim.time_of_flight import TimeOfFlight
+from pybullet_tree_sim.utils.pyb_utils import PyBUtils
+import pybullet_tree_sim.utils.camera_helpers as ch
 import pybullet_tree_sim.utils.xacro_utils as xutils
 import pybullet_tree_sim.utils.yaml_utils as yutils
 from pybullet_tree_sim import CONFIG_PATH, MESHES_PATH, URDF_PATH
@@ -26,15 +28,7 @@ class Robot:
     def __init__(
         self,
         pbclient,
-        # robot_type: str,
-        # robot_urdf_path: str,
-        # tool_link_name: str,
-        # end_effector_link_name: str,
-        # success_link_name: str,
-        # base_link_name: str,
-        # control_joints,
-        # robot_collision_filter_idxs,
-        # init_joint_angles: Optional[list] = None,
+        init_joint_angles: Optional[list] = None,
         position=(0, 0, 0),
         orientation=(0, 0, 0, 1),
         randomize_pose=False,
@@ -42,16 +36,9 @@ class Robot:
     ) -> None:
         self.pbclient = pbclient
         self.verbose = verbose
-        # self.robot_type = robot_type
-        # self.robot_urdf_path = robot_urdf_path
-        # self.tool_link_name = tool_link_name
-        # self.end_effector_link_name = end_effector_link_name
-        # self.success_link_name = success_link_name
-        # self.base_link_name = base_link_name
-        # self.init_joint_angles = init_joint_angles
         self.pos = position
         self.orientation = orientation
-        self.randomize_pose = randomize_pose
+        self.randomize_pose = randomize_pose # TODO: This isn't set up anymore... fix
         self.init_joint_angles = (
             -np.pi / 2,
             -np.pi * 2 / 3,
@@ -59,16 +46,16 @@ class Robot:
             -np.pi,
             -np.pi / 2,
             np.pi,
-        )
+        ) if init_joint_angles is None else init_joint_angles
 
         # Robot setup
         self.robot = None
         # Load robot URDF config
         self.robot_conf = {}
-        # self.robot_conf["joint_info"] = {}
         self._generate_robot_urdf()
         self._setup_robot()
-        num_joints = self.pbclient.getNumJoints(self.robot)
+        self.num_joints = self.pbclient.getNumJoints(self.robot)
+        self.robot_stack: list = self.robot_conf["robot_stack"]
 
         # Joints
         self.joints = self._get_joints()
@@ -159,7 +146,7 @@ class Robot:
         control_joints = []
         control_joint_idxs = []
         for joint, joint_info in joints.items():
-            if joint_info["type"] == 0:
+            if joint_info["type"] == 0: # TODO: Check if this works for prismatic joints or just revolute
                 control_joints.append(joint)
                 control_joint_idxs.append(joint_info["id"])
         return control_joints, control_joint_idxs
@@ -174,7 +161,10 @@ class Robot:
 
     def _assign_collision_links(self) -> list:
         """Find tool0/base pairs, add to collision filter list.
-        Requires that the robot part is ordered from base to tool0."""
+        Requires that the robot part is ordered from base to tool0.
+        
+        TODO: Clean this up, there must be a better way.
+        """
         robot_collision_filter_idxs = []
         for i, robot_part in enumerate(self.robot_conf["robot_stack"]):
             joint_info = self.pbclient.getJointInfo(self.robot, i)
@@ -538,42 +528,7 @@ class Robot:
 
         tf = ee_transform @ pan_tf @ tilt_tf @ base_offset_tf
         return tf
-
-    # TODO: Better types for getCameraImage
-    def get_view_mat_at_curr_pose(self, camera: Camera | TimeOfFlight) -> np.ndarray:
-        """Get view matrix at current pose"""
-        # tf_id = camera.tf_id
-        # log.error(camera.tf_frame)
-        # log.error(camera.tf_id)
-        pos, orientation = self.get_current_pose(camera.tf_id)
-        # log.debug(f"{camera.tf_frame} Pose: {pos}, Orientation: {Rotation.from_quat(orientation).as_euler('xyz')}")
-
-        camera_tf = self.create_camera_transform(pos, orientation, camera)
-
-        # Initial vectors
-        camera_vector = np.array([0, 0, 1]) @ camera_tf[:3, :3].T  #
-        up_vector = np.array([0, 1, 0]) @ camera_tf[:3, :3].T  #
-
-        # log.debug(f"cam vec, up vec:\n{camera_vector}, {up_vector}")
-
-        view_matrix = self.pbclient.computeViewMatrix(
-            cameraEyePosition=camera_tf[:3, 3],
-            cameraTargetPosition=camera_tf[:3, 3] + 0.1 * camera_vector,
-            cameraUpVector=up_vector,
-        )
-        return view_matrix
-
-    # def get_camera_location(
-    #     self, camera: Camera
-    # ):  # TODO: get transform from dictionary. choose between rgb or tof frames
-    #     pose, orientation = self.get_current_pose(camera.tf_id)
-    #     tilt = camera.tilt
-
-    #     camera_tf = self.create_camera_transform(camera=camera)
-    #     return camera_tf
-
-    # Collision checking
-
+        
     def set_collision_filter(self, robot_collision_filter_idxs) -> None:
         """Disable collision between pruner and arm"""
         for i in robot_collision_filter_idxs:
@@ -668,6 +623,83 @@ class Robot:
             for j in range(self.num_joints):
                 self.pbclient.setCollisionFilterPair(self.robot, i, j, 0, 1)
         return
+
+    # TODO: Better types for getCameraImage
+    def get_view_mat_at_curr_pose(self, camera: Camera | TimeOfFlight) -> np.ndarray:
+        """Get view matrix at current pose"""
+        # tf_id = camera.tf_id
+        # log.error(camera.tf_frame)
+        # log.error(camera.tf_id)
+        pos, orientation = self.get_current_pose(camera.tf_id)
+        # log.debug(f"{camera.tf_frame} Pose: {pos}, Orientation: {Rotation.from_quat(orientation).as_euler('xyz')}")
+
+        camera_tf = self.create_camera_transform(pos, orientation, camera)
+
+        # Initial vectors
+        camera_vector = np.array([0, 0, 1]) @ camera_tf[:3, :3].T  #
+        up_vector = np.array([0, 1, 0]) @ camera_tf[:3, :3].T  #
+
+        # log.debug(f"cam vec, up vec:\n{camera_vector}, {up_vector}")
+
+        view_matrix = self.pbclient.computeViewMatrix(
+            cameraEyePosition=camera_tf[:3, 3],
+            cameraTargetPosition=camera_tf[:3, 3] + 0.1 * camera_vector,
+            cameraUpVector=up_vector,
+        )
+        return view_matrix
+    
+    def get_rgbd_at_cur_pose(self, camera, type, view_matrix) -> Tuple:
+        """Get RGBD image at current pose
+        @param camera (Camera): Camera object
+        @param type (str): either 'robot' or 'viz'
+        @param view_matrix (tuple): 16x1 tuple representing the view matrix
+
+        @return (rgb, depth) (tuple): RGB and depth images
+        """
+        # cur_p = self.ur5.get_current_pose(self.camera_link_index)
+        rgbd = self.get_image_at_curr_pose(camera, type, view_matrix)
+        rgb, depth = ch.seperate_rgbd_rgb_d(rgbd, height=camera.depth_height, width=camera.depth_width)
+        depth = depth.astype(np.float32)
+        depth = PyBUtils.linearize_depth(depth, camera.far_val, camera.near_val)
+        return rgb, depth
+        
+    def get_image_at_curr_pose(self, camera, type, view_matrix=None) -> list:
+        """Take the current pose of the end effector and set the camera to that pose"""
+        if type == "robot":
+            if view_matrix is None:
+                raise ValueError("view_matrix cannot be None for robot view")
+            return self.pbclient.getCameraImage(
+                width=camera.depth_width,  # TODO: make separate function for rgb?
+                height=camera.depth_height,
+                viewMatrix=view_matrix,
+                projectionMatrix=camera.depth_proj_mat,  # TODO: ^ same
+                renderer=self.pbclient.ER_BULLET_HARDWARE_OPENGL,
+                flags=self.pbclient.ER_NO_SEGMENTATION_MASK,
+                lightDirection=[1, 1, 1],
+            )
+        elif type == "viz":
+            return self.pbclient.getCameraImage(
+                width=camera.depth_width,
+                height=camera.depth_height,
+                viewMatrix=self.viz_view_matrix,
+                projectionMatrix=self.viz_proj_matrix,
+                renderer=self.pbclient.ER_BULLET_HARDWARE_OPENGL,
+                flags=self.pbclient.ER_NO_SEGMENTATION_MASK,
+                lightDirection=[1, 1, 1],
+            )
+
+    # def get_camera_location(
+    #     self, camera: Camera
+    # ):  # TODO: get transform from dictionary. choose between rgb or tof frames
+    #     pose, orientation = self.get_current_pose(camera.tf_id)
+    #     tilt = camera.tilt
+
+    #     camera_tf = self.create_camera_transform(camera=camera)
+    #     return camera_tf
+
+    # Collision checking
+
+    
 
 
 def main():
