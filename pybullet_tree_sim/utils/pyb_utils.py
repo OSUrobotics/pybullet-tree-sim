@@ -130,30 +130,7 @@ class PyBUtils:
         sphereUid = self.pbclient.createMultiBody(0.0, colSphereId, visualShapeId, pos, [0, 0, 0, 1])
         return sphereUid
 
-    def get_image_at_curr_pose(self, camera, type, view_matrix=None) -> List:
-        """Take the current pose of the end effector and set the camera to that pose"""
-        if type == "robot":
-            if view_matrix is None:
-                raise ValueError("view_matrix cannot be None for robot view")
-            return self.pbclient.getCameraImage(
-                width=camera.depth_width,  # TODO: make separate function for rgb?
-                height=camera.depth_height,
-                viewMatrix=view_matrix,
-                projectionMatrix=camera.depth_proj_mat,  # TODO: ^ same
-                renderer=self.pbclient.ER_BULLET_HARDWARE_OPENGL,
-                flags=self.pbclient.ER_NO_SEGMENTATION_MASK,
-                lightDirection=[1, 1, 1],
-            )
-        elif type == "viz":
-            return self.pbclient.getCameraImage(
-                width=camera.depth_width,
-                height=camera.depth_height,
-                viewMatrix=self.viz_view_matrix,
-                projectionMatrix=self.viz_proj_matrix,
-                renderer=self.pbclient.ER_BULLET_HARDWARE_OPENGL,
-                flags=self.pbclient.ER_NO_SEGMENTATION_MASK,
-                lightDirection=[1, 1, 1],
-            )
+    
 
     # def setup_bird_view_visualizer(self):
     #     self.viz_view_matrix = self.pbclient.computeViewMatrixFromYawPitchRoll(
@@ -164,13 +141,7 @@ class PyBUtils:
     #     )
     #     return
 
-    @staticmethod
-    def seperate_rgbd_rgb_d(rgbd: List, height: int, width: int) -> Tuple[NDArray, NDArray]:
-        """Seperate rgb and depth from the rgbd image, return RGB and depth"""
-        rgb = np.array(rgbd[2]).reshape(height, width, 4) / 255
-        rgb = rgb[:, :, :3]
-        depth = np.array(rgbd[3]).reshape(height, width)
-        return rgb, depth
+    
 
     @staticmethod
     def linearize_depth(depth: NDArray, far_val: float, near_val: float):
@@ -182,20 +153,7 @@ class PyBUtils:
             depth_linearized = None
         return depth_linearized
 
-    def get_rgbd_at_cur_pose(self, camera, type, view_matrix) -> Tuple[NDArray, NDArray]:
-        """Get RGBD image at current pose
-        @param camera (Camera): Camera object
-        @param type (str): either 'robot' or 'viz'
-        @param view_matrix (tuple): 16x1 tuple representing the view matrix
-
-        @return (rgb, depth) (tuple): RGB and depth images
-        """
-        # cur_p = self.ur5.get_current_pose(self.camera_link_index)
-        rgbd = self.get_image_at_curr_pose(camera, type, view_matrix)
-        rgb, depth = self.seperate_rgbd_rgb_d(rgbd, height=camera.depth_height, width=camera.depth_width)
-        depth = depth.astype(np.float32)
-        depth = self.linearize_depth(depth, self.far_val, self.near_val)
-        return rgb, depth
+    
 
     def visualize_points(self, points: List, type: str) -> None:
         dx = 0.1

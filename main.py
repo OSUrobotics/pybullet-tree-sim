@@ -50,11 +50,11 @@ def main():
         try:
             # log.debug(f"{robot.sensors['tof0']}")
             tof0_view_matrix = robot.get_view_mat_at_curr_pose(camera=robot.sensors["tof0"])
-            tof0_rgbd = penv.pbutils.get_rgbd_at_cur_pose(
+            tof0_rgbd = robot.get_rgbd_at_cur_pose(
                 camera=robot.sensors["tof0"], type="robot", view_matrix=tof0_view_matrix
             )
             tof1_view_matrix = robot.get_view_mat_at_curr_pose(camera=robot.sensors["tof1"])
-            tof1_rgbd = penv.pbutils.get_rgbd_at_cur_pose(
+            tof1_rgbd = robot.get_rgbd_at_cur_pose(
                 camera=robot.sensors["tof1"], type="robot", view_matrix=tof1_view_matrix
             )
             # tof0_view_matrix = np.asarray(tof0_view_matrix).reshape((4, 4), order="F")
