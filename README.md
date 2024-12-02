@@ -5,6 +5,7 @@ urdf generic launch CLI test:
 1. For Claire: 
     1. Figure out best way to manage tree/robot/environment interaction. I removed robot from penv, but self.trees still exists. 
     1. Fill out the `object_loader.py` class. Activate/deactivate trees, supports, robots.
+    1. Find the `TODO`s in all the code. Ask Luke what they mean and discuss solutions.
 1. Format the final approach controller as a python subpackage?
     1. https://packaging.python.org/en/latest/guides/packaging-namespace-packages/#packaging-namespace-packages
 1. Add basic cylinder to world. Dynamically create URDF.
