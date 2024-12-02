@@ -61,13 +61,14 @@ def main():
             # log.debug(f"{tof0_view_matrix[:3, 3]}")
 
             keys_pressed = penv.get_key_pressed()
-            action = penv.get_key_action(robot=robot, keys_pressed=keys_pressed)
-            action = action.reshape((6, 1))
+            action = robot.get_key_action(keys_pressed=keys_pressed)
+            # action = action.reshape((6, 1))
             joint_vel, jacobian = robot.calculate_joint_velocities_from_ee_velocity_dls(end_effector_velocity=action)
-            robot.action = joint_vel
-            singularity = robot.set_joint_velocities(robot.action)
-            penv.pbutils.pbclient.stepSimulation()
-            time.sleep(0.01)
+            singularity = robot.set_joint_velocities(joint_velocities=joint_vel)
+            
+            # Step simulation
+            pbutils.pbclient.stepSimulation()
+            time.sleep(0.001)
         except KeyboardInterrupt:
             break
 

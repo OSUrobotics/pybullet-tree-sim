@@ -9,6 +9,7 @@ from pybullet_tree_sim import CONFIG_PATH, MESHES_PATH, URDF_PATH
 
 import glob
 from typing import Optional, Tuple
+import modern_robotics as mr
 import numpy as np
 from pathlib import Path
 import pybullet
@@ -56,16 +57,16 @@ class Robot:
         self._setup_robot()
         self.num_joints = self.pbclient.getNumJoints(self.robot)
         self.robot_stack: list = self.robot_conf["robot_stack"]
-
-        # Joints
-        self.joints = self._get_joints()
-        self.control_joints, self.control_joint_idxs = self._assign_control_joints(self.joints)
-
+        
         # Links
         self.links = self._get_links()
         self.robot_collision_filter_idxs = self._assign_collision_links()
         self.set_collision_filter(self.robot_collision_filter_idxs)
         self.tool0_link_idx = self._get_tool0_link_idx()
+        
+        # Joints
+        self.joints = self._get_joints()
+        self.control_joints, self.control_joint_idxs = self._assign_control_joints(self.joints)
 
         # Sensors
         self.sensors = self._get_sensors()
@@ -184,7 +185,7 @@ class Robot:
         return robot_collision_filter_idxs
 
     def _get_tool0_link_idx(self):
-
+        """TODO: Clean up, find a better way?"""
         return self.links[self.robot_conf["robot_stack"][-1] + "__tool0"]
 
     # def _get_sensor_attributes(self) -> dict:
@@ -231,9 +232,8 @@ class Robot:
                 sensors[sensor_name].tf_frame = (
                     robot_part + "__" + metadata["tf_frame"]
                 )  # TODO: find a better way to get the prefix. If
-                # from robot_conf, need standard for all robots
+                # from robot_conf, need standard for all robots TODO: log an error if robot_part doesn't have all the right frames. Xacro utils?
                 sensors[sensor_name].tf_id = self.links[sensors[sensor_name].tf_frame]
-
             # for key, value in yamlcontent.items():
             #     sensors.update({Path(file).stem: yamlcontent})
         return sensors
@@ -258,73 +258,6 @@ class Robot:
             self.robot_urdf_path, self.pos, self.orientation, flags=flags, useFixedBase=True
         )
         self.num_joints = self.pbclient.getNumJoints(self.robot)
-        # get link indices dynamically
-
-        # # Setup robot info only once
-        # if not self.joints:
-        #     self.joints = dict()
-        #     self.controllable_joints_idxs = []
-        #     self.joint_lower_limits = []
-        #     self.joint_upper_limits = []
-        #     self.joint_max_forces = []
-        #     self.joint_max_velocities = []
-        #     self.joint_ranges = []
-
-        #     for i in range(self.num_joints):
-        #         info = self.pbclient.getJointInfo(self.robot, i)
-        #         jointID = info[0]
-        #         jointName = info[1].decode("utf-8")
-        #         jointType = info[2]
-        #         jointLowerLimit = info[8]
-        #         jointUpperLimit = info[9]
-        #         jointMaxForce = info[10]
-        #         jointMaxVelocity = info[11]
-        #         if self.verbose > 1:
-        #             print("Joint Name: ", jointName, "Joint ID: ", jointID)
-
-        #         controllable = True if jointName in self.control_joints else False
-        #         if controllable:
-        #             self.controllable_joints_idxs.append(i)
-        #             self.joint_lower_limits.append(jointLowerLimit)
-        #             self.joint_upper_limits.append(jointUpperLimit)
-        #             self.joint_max_forces.append(jointMaxForce)
-        #             self.joint_max_velocities.append(jointMaxVelocity)
-        #             self.joint_ranges.append(jointUpperLimit - jointLowerLimit)
-        #             if self.verbose > 1:
-        #                 print("Controllable Joint Name: ", jointName, "Joint ID: ", jointID)
-
-        #         # info = self.joint_info( # TODO: make this into dict, put in robot_conf
-        #         #     jointID,
-        #         #     jointName,
-        #         #     jointType,
-        #         #     jointLowerLimit,
-        #         #     jointUpperLimit,
-        #         #     jointMaxForce,
-        #         #     jointMaxVelocity,
-        #         #     controllable
-        #         # )
-        #         self.robot_conf["joint_info"][jointName] = {
-        #             "id": jointID,
-        #             "type": jointType,
-        #             "lower_limit": jointLowerLimit,
-        #             "upper_limit": jointUpperLimit,
-        #             "max_force": jointMaxForce,
-        #             "max_velocity": jointMaxVelocity,
-        #             "controllable": controllable,
-        #         }
-
-        #         if self.robot_conf["joint_info"][jointName]["type"] == self.pbclient.JOINT_REVOLUTE:
-        #             self.pbclient.setJointMotorControl2(
-        #                 self.robot,
-        #                 self.robot_conf["joint_info"][jointName]["id"],
-        #                 self.pbclient.VELOCITY_CONTROL,
-        #                 targetVelocity=0,
-        #                 force=0,
-        #             )
-        #         # self.joints[info.name] = info
-
-        # # import pprint as pp
-        # # pp.pprint(self.robot_conf)
 
         # # self.init_pos_ee = self.get_current_pose(self.end_effector_index)
         # # self.init_pos_base = self.get_current_pose(self.base_index)
@@ -334,22 +267,6 @@ class Robot:
         # # self.achieved_pos = np.array(self.get_current_pose(self.end_effector_index)[0])
         # # base_pos, base_or = self.get_current_pose(self.base_index)
         return
-
-    # def get_link_index(self, link_name):
-    #     num_joints = self.pbclient.getNumJoints(self.robot)
-    #     for i in range(num_joints):
-    #         info = self.pbclient.getJointInfo(self.robot, i)
-    #         child_link_name = info[12].decode('utf-8')
-    #         log.warn(child_link_name)
-    #         self.robot_conf["tf_frames"].update({child_link_name: i})
-
-    #         if child_link_name == link_name:
-    #             return i # return link index
-
-    #     base_link_name = self.pbclient.getBodyInfo(self.robot)[0].decode('utf-8')
-    #     if base_link_name == link_name:
-    #         return -1 #base link has index of -1
-    #     raise ValueError(f"Link '{link_name}' not found in the robot URDF.")
 
     def reset_robot(self):
         if self.robot is None:
@@ -373,7 +290,6 @@ class Robot:
     def set_joint_angles_no_collision(self, joint_angles) -> None:
         assert len(joint_angles) == len(self.control_joints)
         for i, name in enumerate(self.control_joints):
-            # joint = self.robot_conf["joint_info"][name]
             joint = self.joints[name]
             self.pbclient.resetJointState(self.robot, joint["id"], joint_angles[i], targetVelocity=0)
         return
@@ -383,19 +299,19 @@ class Robot:
 
         assert len(joint_angles) == len(self.control_joints)
         poses = []
-        indexes = []
+        indices = []
         forces = []
 
         for i, name in enumerate(self.control_joints):
             # joint = self.robot_conf["joint_info"][name]
             joint = self.joints[name]
             poses.append(joint_angles[i])
-            indexes.append(joint["id"])
+            indices.append(joint["id"])
             forces.append(joint["max_force"])
 
         self.pbclient.setJointMotorControlArray(
             self.robot,
-            indexes,
+            indices,
             self.pbclient.POSITION_CONTROL,
             targetPositions=joint_angles,
             targetVelocities=[0] * len(poses),
@@ -698,8 +614,157 @@ class Robot:
     #     return camera_tf
 
     # Collision checking
+    # 
+    def deproject_pixels_to_points(
+        self, camera, data: np.ndarray, view_matrix: np.ndarray, return_frame: str = "world", debug=False
+    ) -> np.ndarray:
+        """Compute frame XYZ from image XY and measured depth. Default frame is 'world'.
+        (pixel_coords -- [u,v]) -> (film_coords -- [x,y]) -> (camera_coords -- [X, Y, Z]) -> (world_coords -- [U, V, W])
 
-    
+        https://ksimek.github.io/2013/08/13/intrinsic/
+        https://gachiemchiep.github.io/cheatsheet/camera_calibration/
+        https://stackoverflow.com/questions/4124041/is-opengl-coordinate-system-left-handed-or-right-handed
+
+        @param data: nx1 array of depth values, Fortran order (column-first)
+        @param view_matrix: 4x4 matrix (world -> camera transform)
+        @param return_frame: str, either 'camera' or 'world'
+
+        @return: nx4 array of world XYZ coordinates
+        """
+
+        # log.debug(f"View matrix:\n{view_matrix}")
+        # log.debug(f"Data\n{data}")
+
+        # Flip the y and z axes to convert from OpenGL camera frame to standard camera frame.
+        # https://stackoverflow.com/questions/4124041/is-opengl-coordinate-system-left-handed-or-right-handed
+        # https://github.com/bitlw/LearnProjMatrix/blob/main/doc/OpenGL_Projection.md#introduction
+        # view_matrix[1:3, :] = -view_matrix[1:3, :]
+        #
+
+        proj_matrix = np.asarray(camera.depth_proj_mat).reshape([4, 4], order="F")
+        # log.warning(f'{proj_matrix}')
+        # proj_matrix = camera.depth_proj_mat
+
+        # rgb, depth = self.pbutils.get_rgbd_at_cur_pose(type='robot', view_matrix=view_matrix)
+        # data = depth.reshape((self.cam_width * self.cam_height, 1), order="F")
+
+        # Get camera intrinsics from projection matrix. If square camera, these should be the same.
+        fx = proj_matrix[0, 0]
+        fy = proj_matrix[1, 1]  # if square camera, these should be the same
+
+        # Get camera coordinates from film-plane coordinates. Scale, add z (depth), then homogenize the matrix.
+        cam_coords = np.divide(np.multiply(camera.depth_film_coords, data), [fx, fy])
+        cam_coords = np.concatenate((cam_coords, data, np.ones((camera.depth_width * camera.depth_height, 1))), axis=1)
+
+        if return_frame.strip().lower() == "camera":
+            return cam_coords
+
+        log.warning(f"view_matrix:\n{view_matrix}")
+        world_coords = (mr.TransInv(view_matrix) @ cam_coords.T).T
+
+        if debug:
+            plot.debug_deproject_pixels_to_points(
+                sensor=camera, data=data, cam_coords=cam_coords, world_coords=world_coords, view_matrix=view_matrix
+            )
+
+        return world_coords
+
+    def get_cam_to_frame_coords(
+        self, cam_coords: np.ndarray, start_frame: str, end_frame: str = "world", view_matrix: np.ndarray | None = None
+    ) -> np.ndarray:
+        """Convert camera coordinates to other frame coordinates. Default is world.
+        @param cam_coords: nx4 array of camera XYZ coordinates
+        @param start_frame: str
+        @param end_frame: str (default = 'world')
+        @param view_matrix: 4x4 matrix (frame -> camera transform)
+
+        @return: nx4 array of world XYZ coordinates
+        """
+        end_frame = end_frame.strip().lower()
+        if end_frame == "world" and view_matrix is None:
+            raise ValueError("View matrix required for world frame conversion.")
+        elif end_frame == "world":
+            return (mr.TransInv(view_matrix) @ cam_coords.T).T
+
+        start_frame = start_frame.strip().lower()
+        end_frame_coords = (mr.TransInv(self.ur5.static_frames[f"{start_frame}_to_{end_frame}"]) @ cam_coords.T).T
+
+        return end_frame_coords
+
+    def compute_deprojected_point_mask(self):
+        point_mask = []
+        # TODO: Make this function nicer
+        # Function. Be Nice.
+        # """Find projection stuff in 'treefitting'. Simpole depth to point mask conversion."""
+        # point_mask = np.zeros((self.pbutils.cam_height, self.pbutils.cam_width), dtype=np.float32)
+
+        # proj_matrix = np.asarray(self.pbutils.proj_mat).reshape([4, 4], order="F")
+        # view_matrix = np.asarray(
+        # self.ur5.get_view_mat_at_curr_pose(pan=self.cam_pan, tilt=self.cam_tilt, xyz_offset=self.cam_xyz_offset)
+        # ).reshape([4, 4], order="F")
+        # projection = (
+        #     proj_matrix
+        #     @ view_matrix
+        #     @ np.array([0.5, 0.5, 1, 1])
+        #     # @ np.array([self.tree_goal_pos[0], self.tree_goal_pos[1], self.tree_goal_pos[2], 1])
+        # )
+
+        # # Normalize by w -> homogeneous coordinates
+        # projection = projection / projection[3]
+        # # log.info(f"View matrix: {view_matrix}")
+        # log.info(f"Projection: {projection}")
+        # # if projection within 1,-1, set point mask to 1
+        # if projection[0] < 1 and projection[0] > -1 and projection[1] < 1 and projection[1] > -1:
+        #     projection = (projection + 1) / 2
+        #     row = self.pbutils.cam_height - 1 - int(projection[1] * (self.pbutils.cam_height))
+        #     col = int(projection[0] * self.pbutils.cam_width)
+        #     radius = 5  # TODO: Make this a variable proportional to distance
+        #     # modern scikit uses a tuple for center
+        #     rr, cc = skdraw.disk((row, col), radius)
+        #     print(rr, cc)
+        #     point_mask[
+        #         np.clip(0, rr, self.pbutils.cam_height - 1), np.clip(0, cc, self.pbutils.cam_width - 1)
+        #     ] = 1  # TODO: This is a hack, numbers shouldnt exceed max and min anyways
+
+        # # resize point mask to algo_height, algo_width
+        # point_mask_resize = cv2.resize(point_mask, dsize=(self.algo_width, self.algo_height))
+        # point_mask = np.expand_dims(point_mask_resize, axis=0).astype(np.float32)
+        return point_mask
+
+    def get_key_action(self, keys_pressed: list) -> np.ndarray:
+        """Return an action based on the keys pressed."""
+        action = np.zeros((6,1), dtype=float)
+        if keys_pressed:
+            if ord("a") in keys_pressed:
+                action[0,0] += 0.01
+            if ord("d") in keys_pressed:
+                action[0,0] += -0.01
+            if ord("s") in keys_pressed:
+                action[1,0] += 0.01
+            if ord("w") in keys_pressed:
+                action[1,0] += -0.01
+            if ord("q") in keys_pressed:
+                action[2,0] += 0.01
+            if ord("e") in keys_pressed:
+                action[2,0] += -0.01
+            if ord("z") in keys_pressed:
+                action[3,0] += 0.01
+            if ord("c") in keys_pressed:
+                action[3,0] += -0.01
+            if ord("x") in keys_pressed:
+                action[4,0] += 0.01
+            if ord("v") in keys_pressed:
+                action[4,0] += -0.01
+            if ord("r") in keys_pressed:
+                action[5,0] += 0.05
+            if ord("f") in keys_pressed:
+                action[5,0] += -0.05
+            if ord("o") in keys_pressed:
+                pass
+        else:
+            action = np.zeros((6,1), dtype=float)
+            keys_pressed = []
+        return action
 
 
 def main():
