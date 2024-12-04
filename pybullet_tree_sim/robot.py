@@ -29,15 +29,15 @@ class Robot:
     def __init__(
         self,
         pbclient,
-        init_joint_angles: Optional[list] = None,
         position=(0, 0, 0),
         orientation=(0, 0, 0, 1),
+        init_joint_angles: Optional[list] = None,
         randomize_pose=False,
         verbose=True,
     ) -> None:
         self.pbclient = pbclient
         self.verbose = verbose
-        self.pos = position
+        self.position = position
         self.orientation = orientation
         self.randomize_pose = randomize_pose # TODO: This isn't set up anymore... fix
         self.init_joint_angles = (
@@ -251,11 +251,11 @@ class Robot:
             delta_pos = np.array([0.0, 0.0, 0.0])
             delta_orientation = pybullet.getQuaternionFromEuler([0, 0, 0])
 
-        self.pos, self.orientation = self.pbclient.multiplyTransforms(
-            self.pos, self.orientation, delta_pos, delta_orientation
+        self.position, self.orientation = self.pbclient.multiplyTransforms(
+            self.position, self.orientation, delta_pos, delta_orientation
         )
         self.robot = self.pbclient.loadURDF(  # TODO: change to PyB_ID, this isn't a robot
-            self.robot_urdf_path, self.pos, self.orientation, flags=flags, useFixedBase=True
+            self.robot_urdf_path, self.position, self.orientation, flags=flags, useFixedBase=True
         )
         self.num_joints = self.pbclient.getNumJoints(self.robot)
 
@@ -574,18 +574,21 @@ class Robot:
         """
         # cur_p = self.ur5.get_current_pose(self.camera_link_index)
         rgbd = self.get_image_at_curr_pose(camera, type, view_matrix)
+        log.warn(rgbd)
         rgb, depth = ch.seperate_rgbd_rgb_d(rgbd, height=camera.depth_height, width=camera.depth_width)
         depth = depth.astype(np.float32)
         depth = PyBUtils.linearize_depth(depth, camera.far_val, camera.near_val)
         return rgb, depth
         
     def get_image_at_curr_pose(self, camera, type, view_matrix=None) -> list:
-        """Take the current pose of the end effector and set the camera to that pose"""
-        if type == "robot":
+        """Take the current pose of the sensor and capture an image
+        TODO: Add support for different types of sensors?
+        TOOD: Move sensor/viz view to different methods, viz to pruning env?"""
+        if type == "sensor":
             if view_matrix is None:
-                raise ValueError("view_matrix cannot be None for robot view")
+                raise ValueError("view_matrix cannot be None for sensor view")
             return self.pbclient.getCameraImage(
-                width=camera.depth_width,  # TODO: make separate function for rgb?
+                width=camera.depth_width,  # TODO: how to work with depth + RGB?
                 height=camera.depth_height,
                 viewMatrix=view_matrix,
                 projectionMatrix=camera.depth_proj_mat,  # TODO: ^ same
@@ -616,7 +619,7 @@ class Robot:
     # Collision checking
     # 
     def deproject_pixels_to_points(
-        self, camera, data: np.ndarray, view_matrix: np.ndarray, return_frame: str = "world", debug=False
+        self, sensor, data: np.ndarray, view_matrix: np.ndarray, return_frame: str = "world", debug=False
     ) -> np.ndarray:
         """Compute frame XYZ from image XY and measured depth. Default frame is 'world'.
         (pixel_coords -- [u,v]) -> (film_coords -- [x,y]) -> (camera_coords -- [X, Y, Z]) -> (world_coords -- [U, V, W])
@@ -641,7 +644,7 @@ class Robot:
         # view_matrix[1:3, :] = -view_matrix[1:3, :]
         #
 
-        proj_matrix = np.asarray(camera.depth_proj_mat).reshape([4, 4], order="F")
+        proj_matrix = np.asarray(sensor.depth_proj_mat).reshape([4, 4], order="F")
         # log.warning(f'{proj_matrix}')
         # proj_matrix = camera.depth_proj_mat
 
@@ -653,8 +656,8 @@ class Robot:
         fy = proj_matrix[1, 1]  # if square camera, these should be the same
 
         # Get camera coordinates from film-plane coordinates. Scale, add z (depth), then homogenize the matrix.
-        cam_coords = np.divide(np.multiply(camera.depth_film_coords, data), [fx, fy])
-        cam_coords = np.concatenate((cam_coords, data, np.ones((camera.depth_width * camera.depth_height, 1))), axis=1)
+        cam_coords = np.divide(np.multiply(sensor.depth_film_coords, data), [fx, fy])
+        cam_coords = np.concatenate((cam_coords, data, np.ones((sensor.depth_width * sensor.depth_height, 1))), axis=1)
 
         if return_frame.strip().lower() == "camera":
             return cam_coords
@@ -664,7 +667,7 @@ class Robot:
 
         if debug:
             plot.debug_deproject_pixels_to_points(
-                sensor=camera, data=data, cam_coords=cam_coords, world_coords=world_coords, view_matrix=view_matrix
+                sensor=sensor, data=data, cam_coords=cam_coords, world_coords=world_coords, view_matrix=view_matrix
             )
 
         return world_coords
@@ -687,7 +690,7 @@ class Robot:
             return (mr.TransInv(view_matrix) @ cam_coords.T).T
 
         start_frame = start_frame.strip().lower()
-        end_frame_coords = (mr.TransInv(self.ur5.static_frames[f"{start_frame}_to_{end_frame}"]) @ cam_coords.T).T
+        end_frame_coords = (mr.TransInv(self.static_frames[f"{start_frame}_to_{end_frame}"]) @ cam_coords.T).T
 
         return end_frame_coords
 
@@ -731,7 +734,7 @@ class Robot:
         # point_mask = np.expand_dims(point_mask_resize, axis=0).astype(np.float32)
         return point_mask
 
-    def get_key_action(self, keys_pressed: list) -> np.ndarray:
+    def get_key_move_action(self, keys_pressed: list) -> np.ndarray:
         """Return an action based on the keys pressed."""
         action = np.zeros((6,1), dtype=float)
         if keys_pressed:
@@ -759,13 +762,37 @@ class Robot:
                 action[5,0] += 0.05
             if ord("f") in keys_pressed:
                 action[5,0] += -0.05
-            if ord("o") in keys_pressed:
-                pass
-        else:
-            action = np.zeros((6,1), dtype=float)
-            keys_pressed = []
+        # else:
+        #     action = np.zeros((6,1), dtype=float)
+        #     keys_pressed = []
         return action
+        
+    def get_key_sensor_action(self, keys_pressed: list):
+        if keys_pressed:
+            if ord('p') in keys_pressed:
+                sensor_data = {}
+                for sensor_name, sensor in self.sensors.items():
+                    if sensor_name.startswith('tof'):
+                        view_matrix = self.get_view_mat_at_curr_pose(camera=sensor)
+                        log.warn(view_matrix)
+                        
+                        rgb, depth = self.get_rgbd_at_cur_pose(camera=sensor, type='sensor', view_matrix=view_matrix)
+                        view_matrix = np.asarray(view_matrix).reshape([4, 4], order="F")
+                        depth = depth.reshape((sensor.depth_width * sensor.depth_height, 1), order="F")
+                        
+                        camera_points = self.deproject_pixels_to_points(sensor=sensor, data=depth, view_matrix=view_matrix, return_frame='camera')
+                        
+                        sensor_data.update({sensor_name: {'tf_camera': camera_points, 'view_matrix': view_matrix, 'sensor': sensor}})
+        return
+        
 
+        
+    def get_key_action(self, keys_pressed: list):
+        move_action = self.get_key_move_action(keys_pressed=keys_pressed)
+        camera_action = self.get_key_sensor_action(keys_pressed=keys_pressed)
+        controller_action = self.get_key_controller_action(keys_pressed=keys_pressed)
+        
+        return
 
 def main():
     from pybullet_tree_sim.utils.pyb_utils import PyBUtils
@@ -775,12 +802,7 @@ def main():
 
     robot = Robot(
         pbclient=pbutils.pbclient,
-        # robot_type="ur5e",
-        # base_link_type="linear_slider",
-        # end_effector_type="mock_pruner",
     )
-
-    time.sleep(10)
 
     return
 

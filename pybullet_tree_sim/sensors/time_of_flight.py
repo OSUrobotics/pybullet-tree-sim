@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
-"""Base class for a ToF Camera. Inherits functionality from base Camera class"""
-
-from pybullet_tree_sim.camera import Camera
+"""Base class for a ToF Camera. Inherits functionality from DepthSensor class"""
+from pybullet_tree_sim.sensors.depth_sensor import DepthSensor
 from pybullet_tree_sim.utils import camera_helpers
 from pybullet_tree_sim.utils.pyb_utils import PyBUtils
 import pybullet_tree_sim.utils.yaml_utils as yutils
@@ -10,19 +9,20 @@ import os
 from zenlog import log
 
 
-class TimeOfFlight(Camera):
-    def __init__(self, pbclient, sensor_name: str, sensor_type: str = "tof") -> None:
+class TimeOfFlight(DepthSensor):
+    def __init__(self, sensor_type: str = "tof", *args, **kwargs) -> None:
         """Builds a ToF camera object from a base Camera class"""
-        super().__init__(pbclient=pbclient, sensor_name=sensor_name, sensor_type=sensor_type)
+        super().__init__(sensor_type=sensor_type, *args, **kwargs)
 
         return
 
 
 def main():
+    import pprint as pp
     pbutils = PyBUtils(renders=False)
-    tof = TimeOfFlight(pbutils.pbclient, sensor_name="vl53l8cx")
-    print(tof.depth_proj_mat)
-
+    tof = TimeOfFlight(pbclient=pbutils.pbclient, sensor_name="vl53l8cx")
+    # print(tof.depth_proj_mat)
+    pp.pprint(tof.params)
     return
 
 
