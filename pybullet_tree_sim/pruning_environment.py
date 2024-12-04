@@ -275,8 +275,6 @@ class PruningEnv(gym.Env):
 
         return
 
-    
-
     def is_reachable(self, robot: Robot, vertex: Tuple[np.ndarray], base_xyz: np.ndarray) -> bool:
         # if vertex[3] != "SPUR":
         #     return False
@@ -300,14 +298,14 @@ class PruningEnv(gym.Env):
         return False
 
     def get_reachable_points(self, tree: Tree, env, pyb):
-        # self.reachable_points = list(filter(lambda x: self.is_reachable(x, env, pyb), self.vertex_and_projection))
+        # reachable_points = list(filter(lambda x: self.is_reachable(x, env, pyb), self.vertex_and_projection))
         # np.random.shuffle(self.reachable_points)
         # print("Number of reachable points: ", len(self.reachable_points))
         # if len(self.reachable_points) < 1:
         #     print("No points in reachable points", self.urdf_path)
         #     # self.reset_tree()
 
-        return self.reachable_points
+        return reachable_points
 
     def get_key_pressed(self, relevant=None) -> list:
         """Return the keys pressed by the user."""
@@ -317,12 +315,6 @@ class PruningEnv(gym.Env):
         for key in key_codes:
             keys_pressed.append(key)
         return keys_pressed
-
-    
-        
-    def get_robot_teleop() -> np.ndarray:
-        
-        return
 
 
 def main():
@@ -343,9 +335,10 @@ def main():
     start = 0.31
     stop = 0.35
     # Depth data IRL comes in as a C-format nx1 array. start with this IRL
-    depth_data[:, 3:5] = np.array(
-        [np.arange(start, stop, (stop - start) / 8), np.arange(start, stop, (stop - start) / 8)]
-    ).T
+    depth_data[:, 3:5] = np.array([
+        np.arange(start, stop, (stop - start) / 8),
+        np.arange(start, stop, (stop - start) / 8)
+    ]).T
     depth_data[-1, 3] = 0.31
     # Switch to F-format
     depth_data = depth_data.reshape((tof0.depth_width * tof0.depth_height, 1), order="F")
