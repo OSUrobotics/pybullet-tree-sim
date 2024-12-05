@@ -3,6 +3,7 @@ from pybullet_tree_sim.sensors.sensor import Sensor
 
 class RGBSensor(Sensor):
     def __init__(self, *args, **kwargs) -> None:
+        """TODO: Fill out like the DepthSensor class"""
         super().__init__(*args, **kwargs)
         
         pbclient = kwargs.get("pbclient")

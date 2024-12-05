@@ -3,6 +3,7 @@
 from pybullet_tree_sim import CONFIG_PATH
 import pybullet_tree_sim.utils.yaml_utils as yutils
 
+import numpy as np
 import os
 from zenlog import log
 
@@ -23,6 +24,7 @@ class Sensor:
         self.params = self._load_params(sensor_name=sensor_name, sensor_type=sensor_type)
         self.tf_frame: str
         self.tf_id: int
+        self.xyz_offset = np.zeros(3, dtype=float)
         return
 
     def _load_params(self, sensor_name: str, sensor_type) -> dict:

@@ -12,6 +12,7 @@
         <!-- static properties -->
         <xacro:property name="mock_pruner_mass" value="2.0" />
         <xacro:property name="base__tool0_offset" value="0.0 0.0 0.27208"/>
+        <!-- <xacro:property name="base__tool0_offset" value="0.0 0.0 0.20"/> -->
         <xacro:property name="base__tof0_offset" value="${tof0_offset} 0 0.142"/>
         <xacro:property name="base__tof1_offset" value="${tof1_offset} 0 0.142"/>
         
