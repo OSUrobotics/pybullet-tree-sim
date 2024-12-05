@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
-from pybullet_tree_sim.camera import Camera
-from pybullet_tree_sim.time_of_flight import TimeOfFlight
+from pybullet_tree_sim.sensors.camera import Camera
+from pybullet_tree_sim.sensors.time_of_flight import TimeOfFlight
 from pybullet_tree_sim.utils.pyb_utils import PyBUtils
 import pybullet_tree_sim.utils.camera_helpers as ch
 import pybullet_tree_sim.utils.xacro_utils as xutils
 import pybullet_tree_sim.utils.yaml_utils as yutils
 from pybullet_tree_sim import CONFIG_PATH, MESHES_PATH, URDF_PATH
+
+import pybullet_tree_sim.plot as plot
+
 
 import glob
 from typing import Optional, Tuple
@@ -14,6 +17,7 @@ import numpy as np
 from pathlib import Path
 import pybullet
 import os
+import time
 
 from zenlog import log
 import pprint as pp
@@ -70,7 +74,9 @@ class Robot:
 
         # Sensors
         self.sensors = self._get_sensors()
+        self.debounce_time = time.time()
 
+        # Robot action parameters
         self.action = None
         self.set_joint_angles_no_collision(self.init_joint_angles)
         self.pbclient.stepSimulation()
@@ -122,6 +128,36 @@ class Robot:
         xutils.save_urdf(robot_urdf, urdf_path=self.robot_urdf_path)
         return
 
+    def _setup_robot(self):
+        if self.robot is not None:
+            self.pbclient.removeBody(self.robot)
+            del self.robot
+        flags = self.pbclient.URDF_USE_SELF_COLLISION
+
+        if self.randomize_pose:
+            delta_pos = np.random.rand(3) * 0.0
+            delta_orientation = pybullet.getQuaternionFromEuler(np.random.rand(3) * np.pi / 180 * 5)
+        else:
+            delta_pos = np.array([0.0, 0.0, 0.0])
+            delta_orientation = pybullet.getQuaternionFromEuler([0, 0, 0])
+
+        self.position, self.orientation = self.pbclient.multiplyTransforms(
+            self.position, self.orientation, delta_pos, delta_orientation
+        )
+        self.robot = self.pbclient.loadURDF(  # TODO: change to PyB_ID, this isn't a robot
+            self.robot_urdf_path, self.position, self.orientation, flags=flags, useFixedBase=True
+        )
+        self.num_joints = self.pbclient.getNumJoints(self.robot)
+
+        # # self.init_pos_ee = self.get_current_pose(self.end_effector_index)
+        # # self.init_pos_base = self.get_current_pose(self.base_index)
+        # # self.init_pos_eebase = self.get_current_pose(self.success_link_index)
+        # # self.action = np.zeros(len(self.init_joint_angles), dtype=np.float32)
+        # self.joint_angles = np.array(self.init_joint_angles).astype(np.float32)
+        # # self.achieved_pos = np.array(self.get_current_pose(self.end_effector_index)[0])
+        # # base_pos, base_or = self.get_current_pose(self.base_index)
+        return
+
     def _get_joints(self) -> dict:
         """Return a dict of joint information for the robot"""
         joints = {}
@@ -157,7 +193,7 @@ class Robot:
         for i in range(self.num_joints):
             info = self.pbclient.getJointInfo(self.robot, i)
             child_link_name = info[12].decode("utf-8")
-            links.update({child_link_name: i})
+            links.update({child_link_name: {'id': i, "tf_to_parent": info[14]}})
         return links
 
     def _assign_collision_links(self) -> list:
@@ -178,40 +214,21 @@ class Robot:
                 ):
                     robot_collision_filter_idxs.append(
                         (
-                            self.links[robot_part + "__base"],
-                            self.links[self.robot_conf["robot_stack"][i - 1] + "__tool0"],
+                            self.links[robot_part + "__base"]['id'],
+                            self.links[self.robot_conf["robot_stack"][i - 1] + "__tool0"]['id'],
                         )
                     )
         return robot_collision_filter_idxs
 
     def _get_tool0_link_idx(self):
         """TODO: Clean up, find a better way?"""
-        return self.links[self.robot_conf["robot_stack"][-1] + "__tool0"]
-
-    # def _get_sensor_attributes(self) -> dict:
-    #     # TODO: refactor to only load required sensors
-    #     sensor_attributes = {}
-    #     # Cameras
-    #     camera_configs_path = os.path.join(CONFIG_PATH, "description", "camera",)
-    #     camera_configs_files = glob.glob(os.path.join(camera_configs_path, "*.yaml"))
-    #     for file in camera_configs_files:
-    #         yamlcontent = yutils.load_yaml(file)
-    #         # for key, value in yamlcontent.items():
-    #         sensor_attributes.update({Path(file).stem: yamlcontent})
-    #     # ToFs: TODO: lots of repetitive code here, refactor
-    #     tof_configs_path = os.path.join(CONFIG_PATH, "description", "tof")
-    #     tof_configs_files = glob.glob(os.path.join(tof_configs_path, "*.yaml"))
-    #     for file in tof_configs_files:
-    #         yamlcontent = yutils.load_yaml(file)
-    #         for key, value in yamlcontent.items():
-    #             sensor_attributes.update({Path(file).stem: yamlcontent})
-    #     return sensor_attributes
+        return self.links[self.robot_conf["robot_stack"][-1] + "__tool0"]['id']
 
     def _get_sensors(self) -> dict:
         """Get sensors on robot based on runtime config files"""
         sensors = {}
         robot_part_runtime_conf_path = os.path.join(CONFIG_PATH, "runtime")
-        for robot_part in self.robot_conf["robot_stack"]:
+        for robot_part in self.robot_stack:
             robot_part_runtime_conf_file = os.path.join(robot_part_runtime_conf_path, f"{robot_part}.yaml")
             robot_part_conf = yutils.load_yaml(robot_part_runtime_conf_file)
             if robot_part_conf is None:
@@ -233,40 +250,32 @@ class Robot:
                     robot_part + "__" + metadata["tf_frame"]
                 )  # TODO: find a better way to get the prefix. If
                 # from robot_conf, need standard for all robots TODO: log an error if robot_part doesn't have all the right frames. Xacro utils?
-                sensors[sensor_name].tf_id = self.links[sensors[sensor_name].tf_frame]
+                sensors[sensor_name].tf_id = self.links[sensors[sensor_name].tf_frame]['id']
+                sensors[sensor_name].tf_to_parent = self.links[sensors[sensor_name].tf_frame]['tf_to_parent']
+                sensors[sensor_name].pan = metadata["pan"] # TODO: Are these only for cameras/toFs? If so, needs reorg
+                sensors[sensor_name].tilt = metadata["tilt"]
             # for key, value in yamlcontent.items():
             #     sensors.update({Path(file).stem: yamlcontent})
         return sensors
-
-    def _setup_robot(self):
-        if self.robot is not None:
-            self.pbclient.removeBody(self.robot)
-            del self.robot
-        flags = self.pbclient.URDF_USE_SELF_COLLISION
-
-        if self.randomize_pose:
-            delta_pos = np.random.rand(3) * 0.0
-            delta_orientation = pybullet.getQuaternionFromEuler(np.random.rand(3) * np.pi / 180 * 5)
-        else:
-            delta_pos = np.array([0.0, 0.0, 0.0])
-            delta_orientation = pybullet.getQuaternionFromEuler([0, 0, 0])
-
-        self.position, self.orientation = self.pbclient.multiplyTransforms(
-            self.position, self.orientation, delta_pos, delta_orientation
-        )
-        self.robot = self.pbclient.loadURDF(  # TODO: change to PyB_ID, this isn't a robot
-            self.robot_urdf_path, self.position, self.orientation, flags=flags, useFixedBase=True
-        )
-        self.num_joints = self.pbclient.getNumJoints(self.robot)
-
-        # # self.init_pos_ee = self.get_current_pose(self.end_effector_index)
-        # # self.init_pos_base = self.get_current_pose(self.base_index)
-        # # self.init_pos_eebase = self.get_current_pose(self.success_link_index)
-        # # self.action = np.zeros(len(self.init_joint_angles), dtype=np.float32)
-        # self.joint_angles = np.array(self.init_joint_angles).astype(np.float32)
-        # # self.achieved_pos = np.array(self.get_current_pose(self.end_effector_index)[0])
-        # # base_pos, base_or = self.get_current_pose(self.base_index)
-        return
+        
+    def _get_sensor_attributes(self) -> dict:
+        """TODO: Delete? This is not used"""
+        sensor_attributes = {}
+        # Cameras
+        camera_configs_path = os.path.join(CONFIG_PATH, "description", "camera",)
+        camera_configs_files = glob.glob(os.path.join(camera_configs_path, "*.yaml"))
+        for file in camera_configs_files:
+            yamlcontent = yutils.load_yaml(file)
+            # for key, value in yamlcontent.items():
+            sensor_attributes.update({Path(file).stem: yamlcontent})
+        # ToFs: TODO: lots of repetitive code here, refactor
+        tof_configs_path = os.path.join(CONFIG_PATH, "description", "tof")
+        tof_configs_files = glob.glob(os.path.join(tof_configs_path, "*.yaml"))
+        for file in tof_configs_files:
+            yamlcontent = yutils.load_yaml(file)
+            for key, value in yamlcontent.items():
+                sensor_attributes.update({Path(file).stem: yamlcontent})
+        return sensor_attributes
 
     def reset_robot(self):
         if self.robot is None:
@@ -419,10 +428,10 @@ class Robot:
         return joint_velocities, jacobian
 
     # TODO: Make camera a separate class?
-    def create_camera_transform(self, world_position, world_orientation, camera: Camera) -> np.ndarray:
+    def create_camera_transform(self, world_position, world_orientation, camera: Camera | None) -> np.ndarray:
         """Create rotation matrix for camera"""
         base_offset_tf = np.identity(4)
-        base_offset_tf[:3, 3] = camera.xyz_offset
+        
 
         ee_transform = np.identity(4)
         ee_rot_mat = np.array(self.pbclient.getMatrixFromQuaternion(world_orientation)).reshape(3, 3)
@@ -431,17 +440,26 @@ class Robot:
         ee_transform[:3, 3] = world_position
 
         tilt_tf = np.identity(4)
+        pan_tf = np.identity(4)
+        if camera is None:
+            tilt = 0
+            pan = 0
+        else:
+            tilt = camera.tilt
+            pan = camera.tilt
+            base_offset_tf[:3, 3] = camera.xyz_offset
+
         tilt_rot = np.array(
-            [[1, 0, 0], [0, np.cos(camera.tilt), -np.sin(camera.tilt)], [0, np.sin(camera.tilt), np.cos(camera.tilt)]]
+            [[1, 0, 0], [0, np.cos(tilt), -np.sin(tilt)], [0, np.sin(tilt), np.cos(tilt)]]
         )
         tilt_tf[:3, :3] = tilt_rot
 
-        pan_tf = np.identity(4)
         pan_rot = np.array(
-            [[np.cos(camera.pan), 0, np.sin(camera.pan)], [0, 1, 0], [-np.sin(camera.pan), 0, np.cos(camera.pan)]]
+            [[np.cos(pan), 0, np.sin(pan)], [0, 1, 0], [-np.sin(pan), 0, np.cos(pan)]]
         )
         pan_tf[:3, :3] = pan_rot
-
+        
+            
         tf = ee_transform @ pan_tf @ tilt_tf @ base_offset_tf
         return tf
         
@@ -563,6 +581,26 @@ class Robot:
             cameraUpVector=up_vector,
         )
         return view_matrix
+        
+    def get_view_mat_by_id_at_curr_pose(self, id) -> np.ndarray:
+        pos, orientation = self.get_current_pose(id)
+        camera_tf = self.create_camera_transform(pos, orientation, camera=None)
+        # log.debug(f"End effector Pose: {pos}, Orientation: {Rotation.from_quat(orientation).as_euler('xyz')}")
+        # log.debug(f"camera_tf:\n{camera_tf}")
+        # Initial vectors
+        camera_vector = np.array([0, 0, 1]) @ camera_tf[:3, :3].T
+        up_vector = np.array([0, 1, 0]) @ camera_tf[:3, :3].T
+        
+        # log.debug(f"camera_vector: {camera_vector}")
+        # log.debug(f"up_vector: {up_vector}")
+        
+        view_matrix = self.pbclient.computeViewMatrix(
+            cameraEyePosition=camera_tf[:3, 3],
+            cameraTargetPosition=camera_tf[:3, 3] + 0.1 * camera_vector,
+            cameraUpVector=up_vector,
+        )
+        # log.warn(np.asarray(view_matrix).reshape((4,4), order="F"))
+        return view_matrix
     
     def get_rgbd_at_cur_pose(self, camera, type, view_matrix) -> Tuple:
         """Get RGBD image at current pose
@@ -574,15 +612,20 @@ class Robot:
         """
         # cur_p = self.ur5.get_current_pose(self.camera_link_index)
         rgbd = self.get_image_at_curr_pose(camera, type, view_matrix)
-        log.warn(rgbd)
+        # log.warn(rgbd)
         rgb, depth = ch.seperate_rgbd_rgb_d(rgbd, height=camera.depth_height, width=camera.depth_width)
         depth = depth.astype(np.float32)
+        # log.debug(f"depth_before_lin: {depth}")
+        # log.debug(camera.far_val)
+        # log.debug(camera.near_val)
         depth = PyBUtils.linearize_depth(depth, camera.far_val, camera.near_val)
+        # log.debug(f"depth_after_lin: {depth}")
+
         return rgb, depth
         
     def get_image_at_curr_pose(self, camera, type, view_matrix=None) -> list:
         """Take the current pose of the sensor and capture an image
-        TODO: Add support for different types of sensors?
+        TODO: Add support for different types of sensors? For now, full rgbd
         TOOD: Move sensor/viz view to different methods, viz to pruning env?"""
         if type == "sensor":
             if view_matrix is None:
@@ -656,21 +699,21 @@ class Robot:
         fy = proj_matrix[1, 1]  # if square camera, these should be the same
 
         # Get camera coordinates from film-plane coordinates. Scale, add z (depth), then homogenize the matrix.
-        cam_coords = np.divide(np.multiply(sensor.depth_film_coords, data), [fx, fy])
-        cam_coords = np.concatenate((cam_coords, data, np.ones((sensor.depth_width * sensor.depth_height, 1))), axis=1)
+        sensor_coords = np.divide(np.multiply(sensor.depth_film_coords, data), [fx, fy])
+        sensor_coords = np.concatenate((sensor_coords, data, np.ones((sensor.depth_width * sensor.depth_height, 1))), axis=1)
 
-        if return_frame.strip().lower() == "camera":
-            return cam_coords
-
-        log.warning(f"view_matrix:\n{view_matrix}")
-        world_coords = (mr.TransInv(view_matrix) @ cam_coords.T).T
-
-        if debug:
-            plot.debug_deproject_pixels_to_points(
-                sensor=sensor, data=data, cam_coords=cam_coords, world_coords=world_coords, view_matrix=view_matrix
-            )
-
-        return world_coords
+        return_frame = return_frame.strip().lower()
+        if return_frame == "sensor":
+            return sensor_coords
+        elif return_frame == "world":
+            world_coords = (mr.TransInv(view_matrix) @ sensor_coords.T).T    
+            if debug:
+                plot.debug_deproject_pixels_to_points(
+                    sensor=sensor, data=data, cam_coords=sensor_coords, world_coords=world_coords, view_matrix=view_matrix
+                )
+            return world_coords
+        else:
+            raise ValueError("Invalid return frame. Must be 'camera' or 'world'.")
 
     def get_cam_to_frame_coords(
         self, cam_coords: np.ndarray, start_frame: str, end_frame: str = "world", view_matrix: np.ndarray | None = None
@@ -762,35 +805,36 @@ class Robot:
                 action[5,0] += 0.05
             if ord("f") in keys_pressed:
                 action[5,0] += -0.05
-        # else:
-        #     action = np.zeros((6,1), dtype=float)
-        #     keys_pressed = []
         return action
         
-    def get_key_sensor_action(self, keys_pressed: list):
+    def get_key_sensor_action(self, keys_pressed: list) -> dict | None:
         if keys_pressed:
             if ord('p') in keys_pressed:
-                sensor_data = {}
-                for sensor_name, sensor in self.sensors.items():
-                    if sensor_name.startswith('tof'):
-                        view_matrix = self.get_view_mat_at_curr_pose(camera=sensor)
-                        log.warn(view_matrix)
-                        
-                        rgb, depth = self.get_rgbd_at_cur_pose(camera=sensor, type='sensor', view_matrix=view_matrix)
-                        view_matrix = np.asarray(view_matrix).reshape([4, 4], order="F")
-                        depth = depth.reshape((sensor.depth_width * sensor.depth_height, 1), order="F")
-                        
-                        camera_points = self.deproject_pixels_to_points(sensor=sensor, data=depth, view_matrix=view_matrix, return_frame='camera')
-                        
-                        sensor_data.update({sensor_name: {'tf_camera': camera_points, 'view_matrix': view_matrix, 'sensor': sensor}})
+                if time.time() - self.debounce_time > 0.1:
+                    sensor_data = {}
+                    for sensor_name, sensor in self.sensors.items():
+                        if sensor_name.startswith('tof'):
+                            view_matrix = self.get_view_mat_at_curr_pose(camera=sensor)
+                            rgb, depth = self.get_rgbd_at_cur_pose(camera=sensor, type='sensor', view_matrix=view_matrix)
+                            view_matrix = np.asarray(view_matrix).reshape([4, 4], order="F")
+                            depth = depth.reshape((sensor.depth_width * sensor.depth_height, 1), order="F")
+                            
+                            camera_points = self.deproject_pixels_to_points(sensor=sensor, data=depth, view_matrix=view_matrix, return_frame='sensor')
+                            
+                            sensor_data.update({sensor_name: {'data': camera_points, 'tf_frame': sensor.tf_frame, 'view_matrix': view_matrix, 'sensor': sensor}})
+                    # plot.debug_sensor_world_data(sensor_data)
+                    self.debounce_time = time.time()
+                    return sensor_data
+                else:
+                    return
         return
         
 
         
     def get_key_action(self, keys_pressed: list):
         move_action = self.get_key_move_action(keys_pressed=keys_pressed)
-        camera_action = self.get_key_sensor_action(keys_pressed=keys_pressed)
-        controller_action = self.get_key_controller_action(keys_pressed=keys_pressed)
+        sensor_data = self.get_key_sensor_action(keys_pressed=keys_pressed)
+        # controller_action = self.get_key_controller_action(keys_pressed=keys_pressed)
         
         return
 

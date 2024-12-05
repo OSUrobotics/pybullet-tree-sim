@@ -6,13 +6,11 @@ import numpy as np
 class DepthSensor(Sensor):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        
         pbclient = kwargs.get("pbclient")
                 
-        # # Only dealing with depth data for now, TODO: add RGB data
+        # Get depth sensor parameters
         self.depth_width = self.params["depth"]["width"]
         self.depth_height = self.params["depth"]["height"]
-
         # Some optical sensors only provide diagonal field of view, get horizontal and vertical from diagonal
         try:
             self.depth_vfov = self.params["depth"]["vfov"]

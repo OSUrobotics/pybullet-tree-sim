@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-from pybullet_tree_sim.sensors.camera import Camera
-from pybullet_tree_sim.sensors.time_of_flight import TimeOfFlight
 from pybullet_tree_sim.pruning_environment import PruningEnv
 from pybullet_tree_sim.robot import Robot
 from pybullet_tree_sim.tree import Tree
@@ -27,17 +25,17 @@ def main():
     penv.activate_shape(shape="cylinder", radius=_1_inch * 2, height=2.85, orientation=[0, np.pi / 2, 0])
     # penv.activate_shape(shape="cylinder", radius=0.01, height=2.85, orientation=[0, np.pi / 2, 0])
 
-    penv.load_tree(
-        pbutils=pbutils,
-        scale=1.0,
-        tree_id=1,
-        tree_type="envy",
-        tree_namespace="LPy_",
-        # tree_urdf_path=os.path.join(URDF_PATH, "trees", "envy", "generated", "LPy_envy_tree0.urdf"),
-        save_tree_urdf=False,
-        # randomize_pose=True
-    )
-    penv.activate_tree(tree_id_str="LPy_envy_tree1")
+    # penv.load_tree(
+    #     pbutils=pbutils,
+    #     scale=1.0,
+    #     tree_id=1,
+    #     tree_type="envy",
+    #     tree_namespace="LPy_",
+    #     # tree_urdf_path=os.path.join(URDF_PATH, "trees", "envy", "generated", "LPy_envy_tree0.urdf"),
+    #     save_tree_urdf=False,
+    #     # randomize_pose=True
+    # )
+    # penv.activate_tree(tree_id_str="LPy_envy_tree1")
 
     # # Run the sim a little just to get the environment properly loaded.
     for i in range(100):
@@ -63,10 +61,10 @@ def main():
             # Get user keyboard input, map to robot movement, camera capture, controller action
             keys_pressed = penv.get_key_pressed()
             move_action = robot.get_key_move_action(keys_pressed=keys_pressed)
-            camera_action = robot.get_key_sensor_action(keys_pressed=keys_pressed)
+            sensor_data = robot.get_key_sensor_action(keys_pressed=keys_pressed)
             
-            joint_vel, jacobian = robot.calculate_joint_velocities_from_ee_velocity_dls(end_effector_velocity=move_action)
-            singularity = robot.set_joint_velocities(joint_velocities=joint_vel)
+            joint_vels, jacobian = robot.calculate_joint_velocities_from_ee_velocity_dls(end_effector_velocity=move_action)
+            singularity = robot.set_joint_velocities(joint_velocities=joint_vels)
             
             # Step simulation
             pbutils.pbclient.stepSimulation()
