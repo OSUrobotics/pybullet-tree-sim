@@ -62,10 +62,12 @@ def main():
             keys_pressed = penv.get_key_pressed()
             move_action = robot.get_key_move_action(keys_pressed=keys_pressed)
             sensor_data = robot.get_key_sensor_action(keys_pressed=keys_pressed)
-            
-            joint_vels, jacobian = robot.calculate_joint_velocities_from_ee_velocity_dls(end_effector_velocity=move_action)
+
+            joint_vels, jacobian = robot.calculate_joint_velocities_from_ee_velocity_dls(
+                end_effector_velocity=move_action
+            )
             singularity = robot.set_joint_velocities(joint_velocities=joint_vels)
-            
+
             # Step simulation
             pbutils.pbclient.stepSimulation()
             time.sleep(0.001)
