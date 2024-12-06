@@ -29,7 +29,7 @@
             <xacro:if value="${ str(resolved_parent_part) == 'world'}">
                 <xacro:property name='resolved_parent_link' value='world'/>
             </xacro:if>
-            <xacro:unless value="${ str(resolved_parent_part) == 'world'}">
+            <xacro:unless value="${ str(resolved_parent_part) == 'world' }">
                 <xacro:property name='resolved_parent_link' value="${resolved_parent_part}__tool0"/>
             </xacro:unless>            
        
@@ -160,9 +160,10 @@
             
             <!-- call macro recursively -->
             <xacro:main_loop stack_qty="${stack_qty - 1}"/>
-        </xacro:if>
+        </xacro:if> 
     </xacro:macro>
     
+    <!-- call main loop -->
     <xacro:main_loop stack_qty="$(arg robot_stack_qty)"/>
 
 

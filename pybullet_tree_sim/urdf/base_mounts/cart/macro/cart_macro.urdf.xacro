@@ -10,7 +10,7 @@
     </material>
     <xacro:property name="cart_mass" value="20.0"/>
     <xacro:property name="cart_collision_box_x" value='0.5'/>
-    <xacro:property name="cart_collision_box_y" value='0.5'/>
+    <xacro:property name="cart_collision_box_y" value='1.0'/>
     <xacro:property name="cart_collision_box_z" value='0.75711'/>
     
     <!-- ================== -->
@@ -27,7 +27,7 @@
             <material name="LightGrey"/>
         </visual>
         <collision>
-            <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 -${cart_collision_box_z / 2}"/>
+            <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 ${cart_collision_box_z / 2}"/>
             <geometry>
                 <box size="${cart_collision_box_x} ${cart_collision_box_y} ${cart_collision_box_z}"/>
             </geometry>

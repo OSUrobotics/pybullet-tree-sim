@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-from pybullet_tree_sim.camera import Camera
-from pybullet_tree_sim.time_of_flight import TimeOfFlight
 from pybullet_tree_sim.pruning_environment import PruningEnv
 from pybullet_tree_sim.robot import Robot
 from pybullet_tree_sim.tree import Tree
@@ -50,24 +48,29 @@ def main():
         try:
             # log.debug(f"{robot.sensors['tof0']}")
             tof0_view_matrix = robot.get_view_mat_at_curr_pose(camera=robot.sensors["tof0"])
-            tof0_rgbd = penv.pbutils.get_rgbd_at_cur_pose(
-                camera=robot.sensors["tof0"], type="robot", view_matrix=tof0_view_matrix
+            tof0_rgbd = robot.get_rgbd_at_cur_pose(
+                camera=robot.sensors["tof0"], type="sensor", view_matrix=tof0_view_matrix
             )
             tof1_view_matrix = robot.get_view_mat_at_curr_pose(camera=robot.sensors["tof1"])
-            tof1_rgbd = penv.pbutils.get_rgbd_at_cur_pose(
-                camera=robot.sensors["tof1"], type="robot", view_matrix=tof1_view_matrix
+            tof1_rgbd = robot.get_rgbd_at_cur_pose(
+                camera=robot.sensors["tof1"], type="sensor", view_matrix=tof1_view_matrix
             )
             # tof0_view_matrix = np.asarray(tof0_view_matrix).reshape((4, 4), order="F")
             # log.debug(f"{tof0_view_matrix[:3, 3]}")
 
+            # Get user keyboard input, map to robot movement, camera capture, controller action
             keys_pressed = penv.get_key_pressed()
-            action = penv.get_key_action(robot=robot, keys_pressed=keys_pressed)
-            action = action.reshape((6, 1))
-            joint_vel, jacobian = robot.calculate_joint_velocities_from_ee_velocity_dls(end_effector_velocity=action)
-            robot.action = joint_vel
-            singularity = robot.set_joint_velocities(robot.action)
-            penv.pbutils.pbclient.stepSimulation()
-            time.sleep(0.01)
+            move_action = robot.get_key_move_action(keys_pressed=keys_pressed)
+            sensor_data = robot.get_key_sensor_action(keys_pressed=keys_pressed)
+
+            joint_vels, jacobian = robot.calculate_joint_velocities_from_ee_velocity_dls(
+                end_effector_velocity=move_action
+            )
+            singularity = robot.set_joint_velocities(joint_velocities=joint_vels)
+
+            # Step simulation
+            pbutils.pbclient.stepSimulation()
+            time.sleep(0.001)
         except KeyboardInterrupt:
             break
 
