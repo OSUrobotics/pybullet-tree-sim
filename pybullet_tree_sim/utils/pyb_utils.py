@@ -141,8 +141,6 @@ class PyBUtils:
     #     )
     #     return
 
-    
-
     @staticmethod
     def linearize_depth(depth: NDArray, far_val: float, near_val: float):
         """OpenGL returns contracted depth, linearize it"""
@@ -151,9 +149,7 @@ class PyBUtils:
         except ZeroDivisionError:
             log.warning("Encountered division by 0 in depth linearization.")
             depth_linearized = None
-        return depth_linearized
-
-    
+        return depth_linearized 
 
     def visualize_points(self, points: List, type: str) -> None:
         dx = 0.1
