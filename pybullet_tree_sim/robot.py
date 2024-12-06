@@ -43,15 +43,19 @@ class Robot:
         self.verbose = verbose
         self.position = position
         self.orientation = orientation
-        self.randomize_pose = randomize_pose # TODO: This isn't set up anymore... fix
+        self.randomize_pose = randomize_pose  # TODO: This isn't set up anymore... fix
         self.init_joint_angles = (
-            -np.pi / 2,
-            -np.pi * 2 / 3,
-            np.pi * 2 / 3,
-            -np.pi,
-            -np.pi / 2,
-            np.pi,
-        ) if init_joint_angles is None else init_joint_angles
+            (
+                -np.pi / 2,
+                -np.pi * 2 / 3,
+                np.pi * 2 / 3,
+                -np.pi,
+                -np.pi / 2,
+                np.pi,
+            )
+            if init_joint_angles is None
+            else init_joint_angles
+        )
 
         # Robot setup
         self.robot = None
@@ -61,13 +65,13 @@ class Robot:
         self._setup_robot()
         self.num_joints = self.pbclient.getNumJoints(self.robot)
         self.robot_stack: list = self.robot_conf["robot_stack"]
-        
+
         # Links
         self.links = self._get_links()
         self.robot_collision_filter_idxs = self._assign_collision_links()
         self.set_collision_filter(self.robot_collision_filter_idxs)
         self.tool0_link_idx = self._get_tool0_link_idx()
-        
+
         # Joints
         self.joints = self._get_joints()
         self.control_joints, self.control_joint_idxs = self._assign_control_joints(self.joints)
@@ -183,7 +187,7 @@ class Robot:
         control_joints = []
         control_joint_idxs = []
         for joint, joint_info in joints.items():
-            if joint_info["type"] == 0: # TODO: Check if this works for prismatic joints or just revolute
+            if joint_info["type"] == 0:  # TODO: Check if this works for prismatic joints or just revolute
                 control_joints.append(joint)
                 control_joint_idxs.append(joint_info["id"])
         return control_joints, control_joint_idxs
@@ -194,13 +198,13 @@ class Robot:
             info = self.pbclient.getJointInfo(self.robot, i)
             # log.debug(info)
             child_link_name = info[12].decode("utf-8")
-            links.update({child_link_name: {'id': i, "tf_from_parent": info[14]}})
+            links.update({child_link_name: {"id": i, "tf_from_parent": info[14]}})
         return links
 
     def _assign_collision_links(self) -> list:
         """Find tool0/base pairs, add to collision filter list.
         Requires that the robot part is ordered from base to tool0.
-        
+
         TODO: Clean this up, there must be a better way.
         """
         robot_collision_filter_idxs = []
@@ -215,15 +219,15 @@ class Robot:
                 ):
                     robot_collision_filter_idxs.append(
                         (
-                            self.links[robot_part + "__base"]['id'],
-                            self.links[self.robot_conf["robot_stack"][i - 1] + "__tool0"]['id'],
+                            self.links[robot_part + "__base"]["id"],
+                            self.links[self.robot_conf["robot_stack"][i - 1] + "__tool0"]["id"],
                         )
                     )
         return robot_collision_filter_idxs
 
     def _get_tool0_link_idx(self):
         """TODO: Clean up, find a better way?"""
-        return self.links[self.robot_conf["robot_stack"][-1] + "__tool0"]['id']
+        return self.links[self.robot_conf["robot_stack"][-1] + "__tool0"]["id"]
 
     def _get_sensors(self) -> dict:
         """Get sensors on robot based on runtime config files"""
@@ -251,19 +255,23 @@ class Robot:
                     robot_part + "__" + metadata["tf_frame"]
                 )  # TODO: find a better way to get the prefix. If
                 # from robot_conf, need standard for all robots TODO: log an error if robot_part doesn't have all the right frames. Xacro utils?
-                sensors[sensor_name].tf_id = self.links[sensors[sensor_name].tf_frame]['id']
-                sensors[sensor_name].tf_from_parent = self.links[sensors[sensor_name].tf_frame]['tf_from_parent']
-                sensors[sensor_name].pan = metadata["pan"] # TODO: Are these only for cameras/toFs? If so, needs reorg
+                sensors[sensor_name].tf_id = self.links[sensors[sensor_name].tf_frame]["id"]
+                sensors[sensor_name].tf_from_parent = self.links[sensors[sensor_name].tf_frame]["tf_from_parent"]
+                sensors[sensor_name].pan = metadata["pan"]  # TODO: Are these only for cameras/toFs? If so, needs reorg
                 sensors[sensor_name].tilt = metadata["tilt"]
             # for key, value in yamlcontent.items():
             #     sensors.update({Path(file).stem: yamlcontent})
         return sensors
-        
+
     def _get_sensor_attributes(self) -> dict:
         """TODO: Delete? This is not used"""
         sensor_attributes = {}
         # Cameras
-        camera_configs_path = os.path.join(CONFIG_PATH, "description", "camera",)
+        camera_configs_path = os.path.join(
+            CONFIG_PATH,
+            "description",
+            "camera",
+        )
         camera_configs_files = glob.glob(os.path.join(camera_configs_path, "*.yaml"))
         for file in camera_configs_files:
             yamlcontent = yutils.load_yaml(file)
@@ -432,7 +440,6 @@ class Robot:
     def create_camera_transform(self, world_position, world_orientation, camera: Camera | None) -> np.ndarray:
         """Create rotation matrix for camera"""
         base_offset_tf = np.identity(4)
-        
 
         ee_transform = np.identity(4)
         ee_rot_mat = np.array(self.pbclient.getMatrixFromQuaternion(world_orientation)).reshape(3, 3)
@@ -450,20 +457,15 @@ class Robot:
             pan = camera.tilt
             base_offset_tf[:3, 3] = camera.xyz_offset
 
-        tilt_rot = np.array(
-            [[1, 0, 0], [0, np.cos(tilt), -np.sin(tilt)], [0, np.sin(tilt), np.cos(tilt)]]
-        )
+        tilt_rot = np.array([[1, 0, 0], [0, np.cos(tilt), -np.sin(tilt)], [0, np.sin(tilt), np.cos(tilt)]])
         tilt_tf[:3, :3] = tilt_rot
 
-        pan_rot = np.array(
-            [[np.cos(pan), 0, np.sin(pan)], [0, 1, 0], [-np.sin(pan), 0, np.cos(pan)]]
-        )
+        pan_rot = np.array([[np.cos(pan), 0, np.sin(pan)], [0, 1, 0], [-np.sin(pan), 0, np.cos(pan)]])
         pan_tf[:3, :3] = pan_rot
-        
-            
+
         tf = ee_transform @ pan_tf @ tilt_tf @ base_offset_tf
         return tf
-        
+
     def set_collision_filter(self, robot_collision_filter_idxs) -> None:
         """Disable collision between pruner and arm"""
         for i in robot_collision_filter_idxs:
@@ -582,7 +584,7 @@ class Robot:
             cameraUpVector=up_vector,
         )
         return view_matrix
-        
+
     def get_view_mat_by_id_at_curr_pose(self, id) -> np.ndarray:
         pos, orientation = self.get_current_pose(id)
         camera_tf = self.create_camera_transform(pos, orientation, camera=None)
@@ -591,10 +593,10 @@ class Robot:
         # Initial vectors
         camera_vector = np.array([0, 0, 1]) @ camera_tf[:3, :3].T
         up_vector = np.array([0, 1, 0]) @ camera_tf[:3, :3].T
-        
+
         # log.debug(f"camera_vector: {camera_vector}")
         # log.debug(f"up_vector: {up_vector}")
-        
+
         view_matrix = self.pbclient.computeViewMatrix(
             cameraEyePosition=camera_tf[:3, 3],
             cameraTargetPosition=camera_tf[:3, 3] + 0.1 * camera_vector,
@@ -602,7 +604,7 @@ class Robot:
         )
         # log.warn(np.asarray(view_matrix).reshape((4,4), order="F"))
         return view_matrix
-    
+
     def get_rgbd_at_cur_pose(self, camera, type, view_matrix) -> Tuple:
         """Get RGBD image at current pose
         @param camera (Camera): Camera object
@@ -623,7 +625,7 @@ class Robot:
         # log.debug(f"depth_after_lin: {depth}")
 
         return rgb, depth
-        
+
     def get_image_at_curr_pose(self, camera, type, view_matrix=None) -> list:
         """Take the current pose of the sensor and capture an image
         TODO: Add support for different types of sensors? For now, full rgbd
@@ -661,7 +663,7 @@ class Robot:
     #     return camera_tf
 
     # Collision checking
-    # 
+    #
     def deproject_pixels_to_points(
         self, sensor, data: np.ndarray, view_matrix: np.ndarray, return_frame: str = "world", debug=False
     ) -> np.ndarray:
@@ -701,16 +703,22 @@ class Robot:
 
         # Get camera coordinates from film-plane coordinates. Scale, add z (depth), then homogenize the matrix.
         sensor_coords = np.divide(np.multiply(sensor.depth_film_coords, data), [fx, fy])
-        sensor_coords = np.concatenate((sensor_coords, data, np.ones((sensor.depth_width * sensor.depth_height, 1))), axis=1)
+        sensor_coords = np.concatenate(
+            (sensor_coords, data, np.ones((sensor.depth_width * sensor.depth_height, 1))), axis=1
+        )
 
         return_frame = return_frame.strip().lower()
         if return_frame == "sensor":
             return sensor_coords
         elif return_frame == "world":
-            world_coords = (mr.TransInv(view_matrix) @ sensor_coords.T).T    
+            world_coords = (mr.TransInv(view_matrix) @ sensor_coords.T).T
             if debug:
                 plot.debug_deproject_pixels_to_points(
-                    sensor=sensor, data=data, cam_coords=sensor_coords, world_coords=world_coords, view_matrix=view_matrix
+                    sensor=sensor,
+                    data=data,
+                    cam_coords=sensor_coords,
+                    world_coords=world_coords,
+                    view_matrix=view_matrix,
                 )
             return world_coords
         else:
@@ -780,64 +788,76 @@ class Robot:
 
     def get_key_move_action(self, keys_pressed: list) -> np.ndarray:
         """Return an action based on the keys pressed."""
-        action = np.zeros((6,1), dtype=float)
+        action = np.zeros((6, 1), dtype=float)
         if keys_pressed:
             if ord("a") in keys_pressed:
-                action[0,0] += 0.01
+                action[0, 0] += 0.01
             if ord("d") in keys_pressed:
-                action[0,0] += -0.01
+                action[0, 0] += -0.01
             if ord("s") in keys_pressed:
-                action[1,0] += 0.01
+                action[1, 0] += 0.01
             if ord("w") in keys_pressed:
-                action[1,0] += -0.01
+                action[1, 0] += -0.01
             if ord("q") in keys_pressed:
-                action[2,0] += 0.01
+                action[2, 0] += 0.01
             if ord("e") in keys_pressed:
-                action[2,0] += -0.01
+                action[2, 0] += -0.01
             if ord("z") in keys_pressed:
-                action[3,0] += 0.01
+                action[3, 0] += 0.01
             if ord("c") in keys_pressed:
-                action[3,0] += -0.01
+                action[3, 0] += -0.01
             if ord("x") in keys_pressed:
-                action[4,0] += 0.01
+                action[4, 0] += 0.01
             if ord("v") in keys_pressed:
-                action[4,0] += -0.01
+                action[4, 0] += -0.01
             if ord("r") in keys_pressed:
-                action[5,0] += 0.05
+                action[5, 0] += 0.05
             if ord("f") in keys_pressed:
-                action[5,0] += -0.05
+                action[5, 0] += -0.05
         return action
-        
+
     def get_key_sensor_action(self, keys_pressed: list) -> dict | None:
         if keys_pressed:
-            if ord('p') in keys_pressed:
+            if ord("p") in keys_pressed:
                 if time.time() - self.debounce_time > 0.1:
                     sensor_data = {}
                     for sensor_name, sensor in self.sensors.items():
-                        if sensor_name.startswith('tof'):
+                        if sensor_name.startswith("tof"):
                             view_matrix = self.get_view_mat_at_curr_pose(camera=sensor)
-                            rgb, depth = self.get_rgbd_at_cur_pose(camera=sensor, type='sensor', view_matrix=view_matrix)
+                            rgb, depth = self.get_rgbd_at_cur_pose(
+                                camera=sensor, type="sensor", view_matrix=view_matrix
+                            )
                             view_matrix = np.asarray(view_matrix).reshape([4, 4], order="F")
                             depth = depth.reshape((sensor.depth_width * sensor.depth_height, 1), order="F")
-                            
-                            camera_points = self.deproject_pixels_to_points(sensor=sensor, data=depth, view_matrix=view_matrix, return_frame='sensor')
-                            
-                            sensor_data.update({sensor_name: {'data': camera_points, 'tf_frame': sensor.tf_frame, 'view_matrix': view_matrix, 'sensor': sensor}})
+
+                            camera_points = self.deproject_pixels_to_points(
+                                sensor=sensor, data=depth, view_matrix=view_matrix, return_frame="sensor"
+                            )
+
+                            sensor_data.update(
+                                {
+                                    sensor_name: {
+                                        "data": camera_points,
+                                        "tf_frame": sensor.tf_frame,
+                                        "view_matrix": view_matrix,
+                                        "sensor": sensor,
+                                    }
+                                }
+                            )
                     # plot.debug_sensor_world_data(sensor_data)
                     self.debounce_time = time.time()
                     return sensor_data
                 else:
                     return
         return
-        
 
-        
     def get_key_action(self, keys_pressed: list):
         move_action = self.get_key_move_action(keys_pressed=keys_pressed)
         sensor_data = self.get_key_sensor_action(keys_pressed=keys_pressed)
         # controller_action = self.get_key_controller_action(keys_pressed=keys_pressed)
-        
+
         return
+
 
 def main():
     from pybullet_tree_sim.utils.pyb_utils import PyBUtils

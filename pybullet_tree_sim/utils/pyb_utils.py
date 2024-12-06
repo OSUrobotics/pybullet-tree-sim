@@ -130,8 +130,6 @@ class PyBUtils:
         sphereUid = self.pbclient.createMultiBody(0.0, colSphereId, visualShapeId, pos, [0, 0, 0, 1])
         return sphereUid
 
-    
-
     # def setup_bird_view_visualizer(self):
     #     self.viz_view_matrix = self.pbclient.computeViewMatrixFromYawPitchRoll(
     #         cameraTargetPosition=[-0.3, -0.06, 1.3], distance=1.06, yaw=-120.3, pitch=-12.48, roll=0, upAxisIndex=2
@@ -149,7 +147,7 @@ class PyBUtils:
         except ZeroDivisionError:
             log.warning("Encountered division by 0 in depth linearization.")
             depth_linearized = None
-        return depth_linearized 
+        return depth_linearized
 
     def visualize_points(self, points: List, type: str) -> None:
         dx = 0.1

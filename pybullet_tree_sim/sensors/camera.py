@@ -21,7 +21,7 @@ class Camera(RGBSensor, DepthSensor):
     def __init__(self, sensor_type: str = "camera", *args, **kwargs) -> None:
         super().__init__(sensor_type=sensor_type, *args, **kwargs)
         # TODO: check if camera has depth, check here, not in depth class. How to avoid inheritance without depth? Bool flag passed to super?
-        
+
         return
 
 

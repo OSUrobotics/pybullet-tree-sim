@@ -3,11 +3,12 @@ from pybullet_tree_sim.sensors.sensor import Sensor
 import pybullet_tree_sim.utils.camera_helpers as ch
 import numpy as np
 
+
 class DepthSensor(Sensor):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         pbclient = kwargs.get("pbclient")
-                
+
         # Get depth sensor parameters
         self.depth_width = self.params["depth"]["width"]
         self.depth_height = self.params["depth"]["height"]
@@ -17,7 +18,9 @@ class DepthSensor(Sensor):
             self.depth_hfov = self.params["depth"]["hfov"]
         except KeyError:
             self.depth_dfov = self.params["depth"]["dfov"]
-            self.depth_hfov, self.depth_vfov = ch.get_fov_from_dfov(self.depth_width, self.depth_height, self.depth_dfov)
+            self.depth_hfov, self.depth_vfov = ch.get_fov_from_dfov(
+                self.depth_width, self.depth_height, self.depth_dfov
+            )
         self.near_val = self.params["depth"]["near_plane"]
         self.far_val = self.params["depth"]["far_plane"]
 
@@ -31,17 +34,20 @@ class DepthSensor(Sensor):
         )
         # Depth projection matrix from camera intrinsics
         self.depth_proj_mat = pbclient.computeProjectionMatrixFOV(
-            fov=self.depth_vfov, aspect=(self.depth_width / self.depth_height), nearVal=self.near_val, farVal=self.far_val
+            fov=self.depth_vfov,
+            aspect=(self.depth_width / self.depth_height),
+            nearVal=self.near_val,
+            farVal=self.far_val,
         )
         return
-        
-        
+
+
 def main():
     from pybullet_tree_sim.utils.pyb_utils import PyBUtils
     import pprint as pp
 
     pbutils = PyBUtils(renders=False)
-    sensor = DepthSensor(pbclient=pbutils.pbclient, sensor_name="vl53l8cx", sensor_type = "tof")
+    sensor = DepthSensor(pbclient=pbutils.pbclient, sensor_name="vl53l8cx", sensor_type="tof")
     pp.pprint(sensor.params)
     # pp.pprint(sensor.depth_pixel_coords)
     # pp.pprint(sensor.depth_film_coords)
@@ -51,4 +57,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-        

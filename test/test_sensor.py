@@ -9,13 +9,13 @@ class TestSensor(unittest.TestCase):
     # pbutils = PyBUtils(renders=False)
 
     def test_file_load(self):
-        sensor = Sensor(sensor_name='vl53l8cx', sensor_type='tof')
+        sensor = Sensor(sensor_name="vl53l8cx", sensor_type="tof")
         self.assertTrue(sensor.params is not None)
-        
+
         with self.assertRaises(FileNotFoundError):
-            sensor = Sensor(sensor_name='hello', sensor_type='world')
+            sensor = Sensor(sensor_name="hello", sensor_type="world")
         return
-        
-        
+
+
 if __name__ == "__main__":
     unittest.main()

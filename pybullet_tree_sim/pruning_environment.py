@@ -64,7 +64,6 @@ class PruningEnv(gym.Env):
         name: str = "PruningEnv",
         # num_trees: int | None = None,
         renders: bool = False,
-        
         verbose: bool = True,
     ) -> None:
         """Initialize the Pruning Environment
@@ -87,10 +86,9 @@ class PruningEnv(gym.Env):
         self.global_step_counter = 0
         # self.max_steps = max_steps
 
-
         self.verbose = verbose
 
-        self.collision_object_ids = { # TODO: move to tree.py
+        self.collision_object_ids = {  # TODO: move to tree.py
             "SPUR": None,
             "TRUNK": None,
             "BRANCH": None,
@@ -102,8 +100,6 @@ class PruningEnv(gym.Env):
         self.debouce_time = 0.5
         self.last_button_push_time = time.time()
         return
-
-
 
     def load_tree(  # TODO: Clean up Tree init vs create_tree, probably not needed. Too many file checks.
         self,
@@ -335,10 +331,9 @@ def main():
     start = 0.31
     stop = 0.35
     # Depth data IRL comes in as a C-format nx1 array. start with this IRL
-    depth_data[:, 3:5] = np.array([
-        np.arange(start, stop, (stop - start) / 8),
-        np.arange(start, stop, (stop - start) / 8)
-    ]).T
+    depth_data[:, 3:5] = np.array(
+        [np.arange(start, stop, (stop - start) / 8), np.arange(start, stop, (stop - start) / 8)]
+    ).T
     depth_data[-1, 3] = 0.31
     # Switch to F-format
     depth_data = depth_data.reshape((tof0.depth_width * tof0.depth_height, 1), order="F")
