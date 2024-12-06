@@ -192,8 +192,9 @@ class Robot:
         links = {}
         for i in range(self.num_joints):
             info = self.pbclient.getJointInfo(self.robot, i)
+            # log.debug(info)
             child_link_name = info[12].decode("utf-8")
-            links.update({child_link_name: {'id': i, "tf_to_parent": info[14]}})
+            links.update({child_link_name: {'id': i, "tf_from_parent": info[14]}})
         return links
 
     def _assign_collision_links(self) -> list:
@@ -251,7 +252,7 @@ class Robot:
                 )  # TODO: find a better way to get the prefix. If
                 # from robot_conf, need standard for all robots TODO: log an error if robot_part doesn't have all the right frames. Xacro utils?
                 sensors[sensor_name].tf_id = self.links[sensors[sensor_name].tf_frame]['id']
-                sensors[sensor_name].tf_to_parent = self.links[sensors[sensor_name].tf_frame]['tf_to_parent']
+                sensors[sensor_name].tf_from_parent = self.links[sensors[sensor_name].tf_frame]['tf_from_parent']
                 sensors[sensor_name].pan = metadata["pan"] # TODO: Are these only for cameras/toFs? If so, needs reorg
                 sensors[sensor_name].tilt = metadata["tilt"]
             # for key, value in yamlcontent.items():

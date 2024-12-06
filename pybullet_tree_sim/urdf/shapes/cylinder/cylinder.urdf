@@ -8,7 +8,7 @@
 	<link name="cylinder">
 		<visual>
 			<geometry>
-				<cylinder length="2.82" radius="0.0254"/>
+				<cylinder length="2.81" radius="0.0127"/>
 			</geometry>
 			<material name="LightGrey">
 				<color rgba="0.7 0.7 0.7 1.0"/>
@@ -16,13 +16,13 @@
 		</visual>
 		<collision concave="true">
 			<geometry>
-				<cylinder length="2.82" radius="0.0254"/>
+				<cylinder length="2.81" radius="0.0127"/>
 			</geometry>
 		</collision>
 		<inertial>
 			<mass value="1.0"/>
 			<origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"/>
-			<inertia ixx="0.6628612899999998" ixy="0.0" ixz="0.0" iyy="0.6628612899999998" iyz="0.0" izz="0.00032258"/>
+			<inertia ixx="0.6580486558333333" ixy="0.0" ixz="0.0" iyy="0.6580486558333333" iyz="0.0" izz="8.0645e-05"/>
 		</inertial>
 	</link>
 	<link name="world"/>

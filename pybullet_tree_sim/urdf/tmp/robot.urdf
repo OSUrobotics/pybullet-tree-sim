@@ -42,7 +42,7 @@
 	<link name="dovetail_male_mount__tool0"/>
 	<!-- joints -->
 	<joint name="ur5e__tool0--dovetail_male_mount__base" type="fixed">
-		<origin rpy="0 0 0" xyz="0 0 0"/>
+		<origin rpy="0.0 0.0 0.0" xyz="0 0 0"/>
 		<parent link="ur5e__tool0"/>
 		<child link="dovetail_male_mount__base"/>
 	</joint>
