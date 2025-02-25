@@ -57,6 +57,8 @@ class Robot:
             else init_joint_angles
         )
 
+        self.reset_robot()
+
         # Robot setup
         self.robot = None
         # Load robot URDF config
@@ -306,16 +308,20 @@ class Robot:
                 sensor_attributes.update({Path(file).stem: yamlcontent})
         return sensor_attributes
 
-    def reset_robot(self):
+    def reset_robot(self, joint_angles: tuple = None) -> None:
         if self.robot is None:
             return
         self.init_joint_angles = (
-            -np.pi / 2,
-            -np.pi * 2 / 3,
-            np.pi * 2 / 3,
-            -np.pi,
-            -np.pi / 2,
-            np.pi,
+            (
+                -np.pi / 2 + np.pi / 4,
+                -np.pi * 2 / 3,
+                np.pi * 2 / 3,
+                -np.pi,
+                -np.pi / 2,
+                0,
+            )
+            if joint_angles is None
+            else joint_angles
         )
         self.set_joint_angles_no_collision(self.init_joint_angles)
         return
