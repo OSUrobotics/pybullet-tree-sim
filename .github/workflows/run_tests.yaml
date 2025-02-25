@@ -33,9 +33,12 @@ jobs:
                 options: "--check --verbose --diff --line-length=120 ./"
             
             - name: Lint with flake8
-              run: |
-                # stop the build if there are Python syntax errors or undefined names
-                $ flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+              uses: py-actions/flake8@v2
+              # run: |
+              #   # stop the build if there are Python syntax errors or undefined names
+              #   $ flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+              with:
+                  options: "--count --select=E9,F63,F7,F82 --show-source --statistics"
                 
             - name: Run tests
               run: |
