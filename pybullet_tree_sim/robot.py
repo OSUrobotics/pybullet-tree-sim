@@ -46,12 +46,12 @@ class Robot:
         self.randomize_pose = randomize_pose  # TODO: This isn't set up anymore... fix
         self.init_joint_angles = (
             (
-                -np.pi / 2,
+                -np.pi / 2 + np.pi / 4,
                 -np.pi * 2 / 3,
                 np.pi * 2 / 3,
                 -np.pi,
                 -np.pi / 2,
-                np.pi,
+                0,
             )
             if init_joint_angles is None
             else init_joint_angles
@@ -112,7 +112,8 @@ class Robot:
                 self.robot_conf.update(part_conf)
             else:
                 raise ValueError(f"Robot part {robot_part} not found in {self._robot_configs_path}")
-
+        
+        log.warn(self.robot_conf)
         # Generate URDF from mappings
         robot_urdf = xutils.load_urdf_from_xacro(
             xacro_path=self._robot_xacro_path,
@@ -183,7 +184,7 @@ class Robot:
         return joints
 
     def _assign_control_joints(self, joints: dict) -> list:
-        """Get list of controllabe joints from the joint dict by joint type"""
+        """Get list of controllable joints from the joint dict by joint type"""
         control_joints = []
         control_joint_idxs = []
         for joint, joint_info in joints.items():
@@ -712,6 +713,7 @@ class Robot:
             return sensor_coords
         elif return_frame == "world":
             world_coords = (mr.TransInv(view_matrix) @ sensor_coords.T).T
+            log.err("HELLO WORLD")
             if debug:
                 plot.debug_deproject_pixels_to_points(
                     sensor=sensor,
@@ -831,7 +833,7 @@ class Robot:
                             depth = depth.reshape((sensor.depth_width * sensor.depth_height, 1), order="F")
 
                             camera_points = self.deproject_pixels_to_points(
-                                sensor=sensor, data=depth, view_matrix=view_matrix, return_frame="sensor"
+                                sensor=sensor, data=depth, view_matrix=view_matrix, return_frame="world", debug=False,
                             )
 
                             sensor_data.update(
