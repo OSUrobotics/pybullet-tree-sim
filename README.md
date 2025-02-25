@@ -1,3 +1,7 @@
+
+## TODO:
+Look up Cantera
+
 urdf generic launch CLI test:
 `xacro robot.urdf.xacro > test.urdf end_effector_type:=mock_pruner eef_parent:=ur5e__tool0 arm_type:=ur5 ur_type:=ur5e tf_prefix:=ur5e__ base_attachment_type:=linear_slider`
 
@@ -7,7 +11,7 @@ urdf generic launch CLI test:
 1. For Claire: 
     1. Figure out best way to manage tree/robot/environment interaction. I removed robot from penv, but self.trees still exists. 
     1. Fill out the `object_loader.py` class. Activate/deactivate trees, supports, robots.
-    1. Find the `TODO`s in all the code. Ask Luke what they mean and discuss solutions.
+    1. Find the `TODO`s in all the code. Ask Luke what they meana and discuss solutions.
 1. Format the final approach controller as a python subpackage?
     1. https://packaging.python.org/en/latest/guides/packaging-namespace-packages/#packaging-namespace-packages
 1. Add basic cylinder to world. Dynamically create URDF.
