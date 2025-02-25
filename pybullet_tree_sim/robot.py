@@ -57,7 +57,6 @@ class Robot:
             else init_joint_angles
         )
 
-        self.reset_robot()
 
         # Robot setup
         self.robot = None
@@ -65,6 +64,7 @@ class Robot:
         self.robot_conf = {}
         self._generate_robot_urdf()
         self._setup_robot()
+        self.reset_robot()
         self.num_joints = self.pbclient.getNumJoints(self.robot)
         self.robot_stack: list = self.robot_conf["robot_stack"]
 
