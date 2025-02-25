@@ -57,14 +57,12 @@ class Robot:
             else init_joint_angles
         )
 
-
         # Robot setup
         self.robot = None
         # Load robot URDF config
         self.robot_conf = {}
         self._generate_robot_urdf()
         self._setup_robot()
-        self.reset_robot()
         self.num_joints = self.pbclient.getNumJoints(self.robot)
         self.robot_stack: list = self.robot_conf["robot_stack"]
 
@@ -77,6 +75,7 @@ class Robot:
         # Joints
         self.joints = self._get_joints()
         self.control_joints, self.control_joint_idxs = self._assign_control_joints(self.joints)
+        self.reset_robot()
 
         # Sensors
         self.sensors = self._get_sensors()
@@ -340,7 +339,6 @@ class Robot:
 
     def set_joint_angles(self, joint_angles) -> None:
         """Set joint angles using pybullet motor control"""
-
         assert len(joint_angles) == len(self.control_joints)
         poses = []
         indices = []
