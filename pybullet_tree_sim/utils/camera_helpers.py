@@ -22,7 +22,12 @@ def get_dfov_from_fov(fov: tuple):
     return
 
 
-def get_fov_from_dfov(camera_width: int, camera_height: int, dFoV: Union[int, float], degrees: bool = True):
+def get_fov_from_dfov(
+    camera_width: int,
+    camera_height: int,
+    dFoV: Union[int, float],
+    degrees: bool = True,
+):
     """
     Returns the vertical and horizontal field of view (FoV) in degrees given the diagonal field of view (dFoV) in degrees.
     https://www.litchiutilities.com/docs/fov.php

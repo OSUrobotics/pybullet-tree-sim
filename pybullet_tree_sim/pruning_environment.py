@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-from pybullet_tree_sim import CONFIG_PATH, MESHES_PATH, URDF_PATH, RGB_LABEL, ROBOT_URDF_PATH
+from pybullet_tree_sim import (
+    CONFIG_PATH,
+    MESHES_PATH,
+    URDF_PATH,
+    RGB_LABEL,
+    ROBOT_URDF_PATH,
+)
 from pybullet_tree_sim.robot import Robot
 from pybullet_tree_sim.tree import Tree, TreeException
 
@@ -145,7 +151,10 @@ class PruningEnv(gym.Env):
         return
 
     def activate_tree(
-        self, tree: Tree | None = None, tree_id_str: str | None = None, include_support_posts: bool = True
+        self,
+        tree: Tree | None = None,
+        tree_id_str: str | None = None,
+        include_support_posts: bool = True,
     ) -> None:
         """Activate a tree by object or by tree_id_str. Can include support posts. Must provide either a Tree or tree_id_str.
         @param tree (Tree/None): Tree object to be activated into the pruning environment.
@@ -192,11 +201,18 @@ class PruningEnv(gym.Env):
         return
 
     def activate_support_posts(
-        self, associated_tree: Tree, position: ArrayLike | None = None, orientation: ArrayLike | None = None
+        self,
+        associated_tree: Tree,
+        position: ArrayLike | None = None,
+        orientation: ArrayLike | None = None,
     ) -> None:
         # Load support posts
         if position is None:
-            position = [associated_tree.pos[0], associated_tree.pos[1] - 0.05, 0.0]
+            position = [
+                associated_tree.pos[0],
+                associated_tree.pos[1] - 0.05,
+                0.0,
+            ]
         if orientation is None:
             orientation = Rotation.from_euler("xyz", [np.pi / 2, 0, np.pi / 2]).as_quat()
 
@@ -206,10 +222,15 @@ class PruningEnv(gym.Env):
             urdf_content = xutils.load_urdf_from_xacro(
                 xacro_path=self._supports_and_post_xacro_path, mappings=None
             ).toprettyxml()  # TODO: add mappings
-            xutils.save_urdf(urdf_content=urdf_content, urdf_path=self._supports_and_post_urdf_path)
+            xutils.save_urdf(
+                urdf_content=urdf_content,
+                urdf_path=self._supports_and_post_urdf_path,
+            )
 
         support_post_id = self.pbutils.pbclient.loadURDF(
-            fileName=self._supports_and_post_urdf_path, basePosition=position, baseOrientation=orientation
+            fileName=self._supports_and_post_urdf_path,
+            basePosition=position,
+            baseOrientation=orientation,
         )
         log.info(f"Supports and post activated with PyBID {support_post_id}")
         self.collision_object_ids["SUPPORT"] = support_post_id
@@ -229,7 +250,11 @@ class PruningEnv(gym.Env):
         return
 
     def activate_shape(
-        self, shape: str, position: ArrayLike | None = None, orientation: ArrayLike | None = None, **kwargs
+        self,
+        shape: str,
+        position: ArrayLike | None = None,
+        orientation: ArrayLike | None = None,
+        **kwargs,
     ) -> None:
         """Activate a generic cylinder object in the environment.
         @param shape (str): shape type. Currently supported options are: [cylinder]
@@ -265,7 +290,9 @@ class PruningEnv(gym.Env):
         xutils.save_urdf(urdf_content=urdf_content, urdf_path=shape_urdf_path)
 
         shape_id = self.pbutils.pbclient.loadURDF(
-            fileName=shape_urdf_path, basePosition=position, baseOrientation=orientation
+            fileName=shape_urdf_path,
+            basePosition=position,
+            baseOrientation=orientation,
         )
         log.info(f"{shape.title()} loaded with PyBID {shape_id}")
 
@@ -293,14 +320,14 @@ class PruningEnv(gym.Env):
 
         return False
 
-    def get_reachable_points(self, tree: Tree, env, pyb):
+    def get_reachable_points(self, tree: Tree, env, pyb) -> list:
         # reachable_points = list(filter(lambda x: self.is_reachable(x, env, pyb), self.vertex_and_projection))
         # np.random.shuffle(self.reachable_points)
         # print("Number of reachable points: ", len(self.reachable_points))
         # if len(self.reachable_points) < 1:
         #     print("No points in reachable points", self.urdf_path)
         #     # self.reset_tree()
-
+        reachable_points = []
         return reachable_points
 
     def get_key_pressed(self, relevant=None) -> list:
@@ -316,12 +343,14 @@ class PruningEnv(gym.Env):
 def main():
     from pybullet_tree_sim.time_of_flight import TimeOfFlight
     from pybullet_tree_sim.utils.pyb_utils import PyBUtils
+    from pybullet_tree_sim.robot import Robot
     import numpy as np
     import secrets
 
     pbutils = PyBUtils(renders=False)
     penv = PruningEnv(pbutils=pbutils)
     tof0 = TimeOfFlight(pbclient=pbutils.pbclient, sensor_name="vl53l8cx")
+    robot = Robot(pbclient=pbutils.pbclient)
 
     depth_data = np.zeros((tof0.depth_width, tof0.depth_height), dtype=float)
     # generator = np.random.default_rng(seed=secrets.randbits(128))
@@ -332,7 +361,10 @@ def main():
     stop = 0.35
     # Depth data IRL comes in as a C-format nx1 array. start with this IRL
     depth_data[:, 3:5] = np.array(
-        [np.arange(start, stop, (stop - start) / 8), np.arange(start, stop, (stop - start) / 8)]
+        [
+            np.arange(start, stop, (stop - start) / 8),
+            np.arange(start, stop, (stop - start) / 8),
+        ]
     ).T
     depth_data[-1, 3] = 0.31
     # Switch to F-format
