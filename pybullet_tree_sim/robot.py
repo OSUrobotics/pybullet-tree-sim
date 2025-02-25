@@ -126,7 +126,8 @@ class Robot:
             if robot_part.startswith("ur"):
                 ur_absolute_mesh_path = "/opt/ros/humble/share/ur_description/meshes"
                 robot_urdf = robot_urdf.replace(
-                    f'filename="package://ur_description/meshes', f'filename="{ur_absolute_mesh_path}'
+                    f'filename="package://ur_description/meshes',
+                    f'filename="{ur_absolute_mesh_path}',
                 )
         # Save the generated URDF
         self.robot_urdf_path = os.path.join(self._urdf_tmp_path, "robot.urdf")
@@ -150,7 +151,11 @@ class Robot:
             self.position, self.orientation, delta_pos, delta_orientation
         )
         self.robot = self.pbclient.loadURDF(  # TODO: change to PyB_ID, this isn't a robot
-            self.robot_urdf_path, self.position, self.orientation, flags=flags, useFixedBase=True
+            self.robot_urdf_path,
+            self.position,
+            self.orientation,
+            flags=flags,
+            useFixedBase=True,
         )
         self.num_joints = self.pbclient.getNumJoints(self.robot)
 
@@ -248,9 +253,23 @@ class Robot:
             # Create sensors
             for sensor_name, metadata in sensor_conf.items():
                 if metadata["type"] == "camera":
-                    sensors.update({sensor_name: Camera(pbclient=self.pbclient, sensor_name=metadata["name"])})
+                    sensors.update(
+                        {
+                            sensor_name: Camera(
+                                pbclient=self.pbclient,
+                                sensor_name=metadata["name"],
+                            )
+                        }
+                    )
                 elif metadata["type"] == "tof":
-                    sensors.update({sensor_name: TimeOfFlight(pbclient=self.pbclient, sensor_name=metadata["name"])})
+                    sensors.update(
+                        {
+                            sensor_name: TimeOfFlight(
+                                pbclient=self.pbclient,
+                                sensor_name=metadata["name"],
+                            )
+                        }
+                    )
                 # Assign TF frame and pybullet frame id to sensor
                 sensors[sensor_name].tf_frame = (
                     robot_part + "__" + metadata["tf_frame"]
@@ -382,7 +401,10 @@ class Robot:
     def get_current_vel(self, index):
         """Returns current pose of the index."""
         link_state = self.pbclient.getLinkState(
-            self.robot, index, computeLinkVelocity=True, computeForwardKinematics=True
+            self.robot,
+            index,
+            computeLinkVelocity=True,
+            computeForwardKinematics=True,
         )
         trans, ang = link_state[6], link_state[7]
         return trans, ang
@@ -458,10 +480,22 @@ class Robot:
             pan = camera.tilt
             base_offset_tf[:3, 3] = camera.xyz_offset
 
-        tilt_rot = np.array([[1, 0, 0], [0, np.cos(tilt), -np.sin(tilt)], [0, np.sin(tilt), np.cos(tilt)]])
+        tilt_rot = np.array(
+            [
+                [1, 0, 0],
+                [0, np.cos(tilt), -np.sin(tilt)],
+                [0, np.sin(tilt), np.cos(tilt)],
+            ]
+        )
         tilt_tf[:3, :3] = tilt_rot
 
-        pan_rot = np.array([[np.cos(pan), 0, np.sin(pan)], [0, 1, 0], [-np.sin(pan), 0, np.cos(pan)]])
+        pan_rot = np.array(
+            [
+                [np.cos(pan), 0, np.sin(pan)],
+                [0, 1, 0],
+                [-np.sin(pan), 0, np.cos(pan)],
+            ]
+        )
         pan_tf[:3, :3] = pan_rot
 
         tf = ee_transform @ pan_tf @ tilt_tf @ base_offset_tf
@@ -497,7 +531,10 @@ class Robot:
         """Check if there are any collisions between the robot and the environment
         Returns: Dictionary with information about collisions (Acceptable and Unacceptable)
         """
-        collision_info = {"collisions_acceptable": False, "collisions_unacceptable": False}
+        collision_info = {
+            "collisions_acceptable": False,
+            "collisions_unacceptable": False,
+        }
 
         collision_acceptable_list = ["SPUR", "WATER_BRANCH"]
         collision_unacceptable_list = ["TRUNK", "BRANCH", "SUPPORT"]
@@ -666,7 +703,12 @@ class Robot:
     # Collision checking
     #
     def deproject_pixels_to_points(
-        self, sensor, data: np.ndarray, view_matrix: np.ndarray, return_frame: str = "world", debug=False
+        self,
+        sensor,
+        data: np.ndarray,
+        view_matrix: np.ndarray,
+        return_frame: str = "world",
+        debug=False,
     ) -> np.ndarray:
         """Compute frame XYZ from image XY and measured depth. Default frame is 'world'.
         (pixel_coords -- [u,v]) -> (film_coords -- [x,y]) -> (camera_coords -- [X, Y, Z]) -> (world_coords -- [U, V, W])
@@ -705,7 +747,12 @@ class Robot:
         # Get camera coordinates from film-plane coordinates. Scale, add z (depth), then homogenize the matrix.
         sensor_coords = np.divide(np.multiply(sensor.depth_film_coords, data), [fx, fy])
         sensor_coords = np.concatenate(
-            (sensor_coords, data, np.ones((sensor.depth_width * sensor.depth_height, 1))), axis=1
+            (
+                sensor_coords,
+                data,
+                np.ones((sensor.depth_width * sensor.depth_height, 1)),
+            ),
+            axis=1,
         )
 
         return_frame = return_frame.strip().lower()
@@ -727,7 +774,11 @@ class Robot:
             raise ValueError("Invalid return frame. Must be 'camera' or 'world'.")
 
     def get_cam_to_frame_coords(
-        self, cam_coords: np.ndarray, start_frame: str, end_frame: str = "world", view_matrix: np.ndarray | None = None
+        self,
+        cam_coords: np.ndarray,
+        start_frame: str,
+        end_frame: str = "world",
+        view_matrix: np.ndarray | None = None,
     ) -> np.ndarray:
         """Convert camera coordinates to other frame coordinates. Default is world.
         @param cam_coords: nx4 array of camera XYZ coordinates
@@ -827,10 +878,15 @@ class Robot:
                         if sensor_name.startswith("tof"):
                             view_matrix = self.get_view_mat_at_curr_pose(camera=sensor)
                             rgb, depth = self.get_rgbd_at_cur_pose(
-                                camera=sensor, type="sensor", view_matrix=view_matrix
+                                camera=sensor,
+                                type="sensor",
+                                view_matrix=view_matrix,
                             )
                             view_matrix = np.asarray(view_matrix).reshape([4, 4], order="F")
-                            depth = depth.reshape((sensor.depth_width * sensor.depth_height, 1), order="F")
+                            depth = depth.reshape(
+                                (sensor.depth_width * sensor.depth_height, 1),
+                                order="F",
+                            )
 
                             camera_points = self.deproject_pixels_to_points(
                                 sensor=sensor,

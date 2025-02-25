@@ -17,7 +17,11 @@ def main():
     import pprint as pp
 
     pbutils = PyBUtils(renders=False)
-    sensor = RGBSensor(pbclient=pbutils.pbclient, sensor_name="realsense_d435i", sensor_type="camera")
+    sensor = RGBSensor(
+        pbclient=pbutils.pbclient,
+        sensor_name="realsense_d435i",
+        sensor_type="camera",
+    )
     pp.pprint(sensor.params)
     # pp.pprint(sensor.depth_film_coords)
     # pp.pprint(sensor.depth_proj_mat)

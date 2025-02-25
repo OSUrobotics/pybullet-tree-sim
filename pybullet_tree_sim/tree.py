@@ -18,9 +18,13 @@ import numpy as np
 import pybullet
 import pywavefront
 from nptyping import NDArray, Shape, Float
+from numpy.typing import ArrayLike
 from pybullet_tree_sim import RGB_LABEL, URDF_PATH, MESHES_PATH, PKL_PATH
 from pybullet_tree_sim.utils.pyb_utils import PyBUtils
-from pybullet_tree_sim.utils.camera_helpers import compute_perpendicular_projection_vector
+from pybullet_tree_sim.utils.camera_helpers import (
+    compute_perpendicular_projection_vector,
+)
+from pybullet_tree_sim.utils import math_helpers as mh
 import pybullet_tree_sim.utils.xacro_utils as xutils
 from scipy.spatial.transform import Rotation
 import xacro
@@ -86,14 +90,27 @@ class Tree:
 
         # URDF
         urdf_content, self.urdf_path = Tree.load_tree_urdf(
-            scale=scale, tree_id=id, tree_type=tree_type, namespace=namespace, parent=parent, tree_urdf_path=urdf_path
+            scale=scale,
+            tree_id=id,
+            tree_type=tree_type,
+            namespace=namespace,
+            parent=parent,
+            tree_urdf_path=urdf_path,
         )
         log.info(f"Tree URDF loaded: {self.urdf_path}")
         # OBJ
-        tree_obj = Tree.load_tree_obj(tree_id=id, tree_type=tree_type, namespace=namespace, tree_obj_path=obj_path)
+        tree_obj = Tree.load_tree_obj(
+            tree_id=id,
+            tree_type=tree_type,
+            namespace=namespace,
+            tree_obj_path=obj_path,
+        )
         # Labelled OBJ
         labeled_tree_obj = Tree.load_labeled_tree_obj(
-            tree_id=id, tree_type=tree_type, namespace=namespace, labeled_tree_obj_path=labeled_tree_obj_path
+            tree_id=id,
+            tree_type=tree_type,
+            namespace=namespace,
+            labeled_tree_obj_path=labeled_tree_obj_path,
         )
 
         # Tree specific parameters
@@ -135,7 +152,12 @@ class Tree:
             tree_obj_vertices_labeled.append(vertex + (vertex_to_label[vertex],))
 
         # # # TODO: begin() method or something
-        self.transformed_vertices = list(map(lambda x: self.transform_tree_obj_vertex(x), tree_obj_vertices_labeled))
+        self.transformed_vertices = list(
+            map(
+                lambda x: self.transform_tree_obj_vertex(x),
+                tree_obj_vertices_labeled,
+            )
+        )
 
         # if pickled file exists load and return
         path_component = os.path.normpath(self.urdf_path).split(os.path.sep)
@@ -210,7 +232,12 @@ class Tree:
             for j in range(num_longitude_bins):
                 lon_min = np.rad2deg(-np.pi + j * bin_size)
                 lon_max = np.rad2deg(-np.pi + (j + 1) * bin_size)
-                bins[(round((lat_min + lat_max) / 2), round((lon_min + lon_max) / 2))] = []
+                bins[
+                    (
+                        round((lat_min + lat_max) / 2),
+                        round((lon_min + lon_max) / 2),
+                    )
+                ] = []
         return bins
 
     def transform_tree_obj_vertex(self, vertex: ArrayLike) -> Tuple[np.ndarray, float]:
@@ -247,11 +274,14 @@ class Tree:
             direction_vector = direction_vector / np.linalg.norm(direction_vector)
             lat_angle = np.rad2deg(np.arcsin(direction_vector[2])) + offset
             lon_angle = np.rad2deg(np.arctan2(direction_vector[1], direction_vector[0])) + offset
-            lat_angle_min = rounddown(lat_angle)
-            lat_angle_max = roundup(lat_angle)
-            lon_angle_min = rounddown(lon_angle)
-            lon_angle_max = roundup(lon_angle)
-            bin_key = (round((lat_angle_min + lat_angle_max) / 2), round((lon_angle_min + lon_angle_max) / 2))
+            lat_angle_min = mh.rounddown(lat_angle)
+            lat_angle_max = mh.roundup(lat_angle)
+            lon_angle_min = mh.rounddown(lon_angle)
+            lon_angle_max = mh.roundup(lon_angle)
+            bin_key = (
+                round((lat_angle_min + lat_angle_max) / 2),
+                round((lon_angle_min + lon_angle_max) / 2),
+            )
             # if bin_key[0] not in between -85 and 85 set as 85 or -85
             # if bin_keyp[1] not in between -175 and 175 set as 175 or -175
 
@@ -331,7 +361,7 @@ class Tree:
             scale = np.random.uniform()
             tree_point = (1 - scale) * self.transformed_vertices[ab[0]][0] + scale * self.transformed_vertices[ab[1]][0]
 
-            # Label the face as the majority label of the vertices
+            # Label the face as the majority label of the verticesp
             labels = [
                 self.transformed_vertices[ab[0]][1],
                 self.transformed_vertices[ab[1]][1],
@@ -362,14 +392,20 @@ class Tree:
 
     def filter_outliers(self):
         # Filter out outliers
-        print("Number of points before filtering: ", len(self.vertex_and_projection))
+        print(
+            "Number of points before filtering: ",
+            len(self.vertex_and_projection),
+        )
         self.vertex_and_projection = list(
             filter(
                 lambda x: np.linalg.norm(x[1]) > self.projection_mean + 0.5 * self.projection_std,
                 self.vertex_and_projection,
             )
         )
-        print("Number of points after filtering: ", len(self.vertex_and_projection))
+        print(
+            "Number of points after filtering: ",
+            len(self.vertex_and_projection),
+        )
         return
 
     def filter_points_below_base(self, base_xyz):
@@ -379,9 +415,15 @@ class Tree:
 
     def filter_trunk_points(self):
         self.vertex_and_projection = list(
-            filter(lambda x: abs(x[0][0] - self.pos[0]) > 0.8, self.vertex_and_projection)
+            filter(
+                lambda x: abs(x[0][0] - self.pos[0]) > 0.8,
+                self.vertex_and_projection,
+            )
         )
-        print("Number of points after filtering trunk points: ", len(self.vertex_and_projection))
+        print(
+            "Number of points after filtering trunk points: ",
+            len(self.vertex_and_projection),
+        )
         return
 
     @staticmethod
@@ -444,7 +486,10 @@ class Tree:
                 raise TreeException(
                     "If parameter 'tree_urdf_path' is not provided, namespace, type, and id must be provided."
                 )
-            urdf_path = os.path.join(Tree._tree_generated_urdf_path, f"{namespace}{tree_type}_tree{tree_id}.urdf")
+            urdf_path = os.path.join(
+                Tree._tree_generated_urdf_path,
+                f"{namespace}{tree_type}_tree{tree_id}.urdf",
+            )
             if not os.path.exists(urdf_path):
                 log.info(f"Could not find file '{urdf_path}'. Generating URDF from xacro.")
 
@@ -477,7 +522,10 @@ class Tree:
 
     @staticmethod
     def load_tree_obj(
-        tree_id: int | None = None, tree_type: str | None = None, namespace: str = "", tree_obj_path: str | None = None
+        tree_id: int | None = None,
+        tree_type: str | None = None,
+        namespace: str = "",
+        tree_obj_path: str | None = None,
     ):
 
         if tree_obj_path is None:
@@ -485,7 +533,10 @@ class Tree:
                 raise TreeException(
                     "If paramter 'tree_obj_path' is not provided, namespace, type, and id must be provided."
                 )
-            _obj_file = os.path.join(Tree._tree_meshes_unlabeled_path, f"{namespace}{tree_type}_tree{tree_id}.obj")
+            _obj_file = os.path.join(
+                Tree._tree_meshes_unlabeled_path,
+                f"{namespace}{tree_type}_tree{tree_id}.obj",
+            )
             if not os.path.exists(_obj_file):
                 raise TreeException(
                     f"Tree with namespace '{namespace}', type {tree_type}, and id {tree_id} does not exist."
@@ -512,7 +563,8 @@ class Tree:
                     "If labeled_tree_obj_path is not provided, namespace, type, and id must be provided."
                 )
             _obj_file = os.path.join(
-                Tree._tree_meshes_labeled_path, f"{namespace}{tree_type}_labeled_tree{tree_id}.obj"
+                Tree._tree_meshes_labeled_path,
+                f"{namespace}{tree_type}_labeled_tree{tree_id}.obj",
             )
             if not os.path.exists(_obj_file):
                 log.info(f"Could not find file '{_obj_file}'.")
