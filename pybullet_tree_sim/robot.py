@@ -112,7 +112,7 @@ class Robot:
                 self.robot_conf.update(part_conf)
             else:
                 raise ValueError(f"Robot part {robot_part} not found in {self._robot_configs_path}")
-        
+
         log.warn(self.robot_conf)
         # Generate URDF from mappings
         robot_urdf = xutils.load_urdf_from_xacro(
@@ -833,7 +833,11 @@ class Robot:
                             depth = depth.reshape((sensor.depth_width * sensor.depth_height, 1), order="F")
 
                             camera_points = self.deproject_pixels_to_points(
-                                sensor=sensor, data=depth, view_matrix=view_matrix, return_frame="world", debug=False,
+                                sensor=sensor,
+                                data=depth,
+                                view_matrix=view_matrix,
+                                return_frame="world",
+                                debug=False,
                             )
 
                             sensor_data.update(
