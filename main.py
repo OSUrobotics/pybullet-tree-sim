@@ -22,7 +22,12 @@ def main():
     )
 
     _1_inch = 0.0254
-    penv.activate_shape(shape="cylinder", radius=_1_inch * 2, height=2.85, orientation=[0, np.pi / 2, 0])
+    penv.activate_shape(
+        shape="cylinder",
+        radius=_1_inch * 2,
+        height=2.85,
+        orientation=[0, np.pi / 2, 0],
+    )
     # penv.activate_shape(shape="cylinder", radius=0.01, height=2.85, orientation=[0, np.pi / 2, 0])
 
     # penv.load_tree(
@@ -49,11 +54,15 @@ def main():
             # log.debug(f"{robot.sensors['tof0']}")
             tof0_view_matrix = robot.get_view_mat_at_curr_pose(camera=robot.sensors["tof0"])
             tof0_rgbd = robot.get_rgbd_at_cur_pose(
-                camera=robot.sensors["tof0"], type="sensor", view_matrix=tof0_view_matrix
+                camera=robot.sensors["tof0"],
+                type="sensor",
+                view_matrix=tof0_view_matrix,
             )
             tof1_view_matrix = robot.get_view_mat_at_curr_pose(camera=robot.sensors["tof1"])
             tof1_rgbd = robot.get_rgbd_at_cur_pose(
-                camera=robot.sensors["tof1"], type="sensor", view_matrix=tof1_view_matrix
+                camera=robot.sensors["tof1"],
+                type="sensor",
+                view_matrix=tof1_view_matrix,
             )
             # tof0_view_matrix = np.asarray(tof0_view_matrix).reshape((4, 4), order="F")
             # log.debug(f"{tof0_view_matrix[:3, 3]}")
