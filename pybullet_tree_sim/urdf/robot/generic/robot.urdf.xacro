@@ -139,8 +139,8 @@
                 <!-- Args -->
                 <xacro:arg name="mock_pruner_prefix" default="mock_pruner__" />
                 <xacro:arg name="mesh_base_path" default="" />    
-                <xacro:arg name="tof0_offset_x" default="0.02" />
-                <xacro:arg name="tof1_offset_x" default="-0.02" />
+                <xacro:arg name="tof0_offset" default="0.1 0.0 0.142" />
+                <xacro:arg name="tof1_offset" default="-0.1 0.0 0.142"/>
             
                 <!-- mock_pruner  -->            
                 <xacro:mock_pruner_macro
@@ -148,8 +148,8 @@
                     parent_link="${resolved_parent_link}"
                     mesh_base_path="$(arg mesh_base_path)"
                     urdf_base_path="$(arg urdf_base_path)"
-                    tof0_offset='$(arg tof0_offset_x)'
-                    tof1_offset='$(arg tof1_offset_x)'
+                    tof0_offset='$(arg tof0_offset)'
+                    tof1_offset='$(arg tof1_offset)'
                     camera_offset=''
                 />
             </xacro:if>
