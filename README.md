@@ -1,4 +1,21 @@
 
+## Using this package
+
+### Adding trees
+All trees should be defined by their origin namespace, the tree type, and the tree id. Tree ids should be zero-padded by 5 spaces.
+
+```
+# Pattern:
+{tree_namespace}_{tree_type}_{tree_id}
+
+# Examples:
+LPy_envy_00027
+prosser_ufo_00762
+```
+
+Trees should include a generic mesh and and a labeled mesh. LPy trees can be generated `TODO: TALK TO ABHINAV`
+
+
 ## TODO:
 Look up Cantera
 
