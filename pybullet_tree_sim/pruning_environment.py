@@ -111,15 +111,15 @@ class PruningEnv(gym.Env):
         self,
         pbutils: PyBUtils,
         scale: float,
-        position: ArrayLike = [0, 0, 0],
-        orientation: ArrayLike = [0, 0, 0, 1],
+        position: np.ndarray = np.array([0, 0, 0]),
+        orientation: np.ndarray = np.array([0, 0, 0, 1]),
         tree_id: int = None,
         tree_type: str = None,
         tree_namespace: str = "",
         tree_urdf_path: str | None = None,
         save_tree_urdf: bool = False,
         randomize_pose: bool = False,
-    ) -> None:
+    ) -> str:
         if randomize_pose:
             ...
 
@@ -131,7 +131,7 @@ class PruningEnv(gym.Env):
                 )
 
         # Get tree object
-        tree = Tree.create_tree(
+        tree = Tree(
             pbutils=pbutils,
             scale=scale,
             position=position,
@@ -139,16 +139,16 @@ class PruningEnv(gym.Env):
             tree_id=tree_id,
             tree_type=tree_type,
             namespace=tree_namespace,
-            tree_urdf_path=tree_urdf_path,
+            urdf_path=tree_urdf_path,
             randomize_pose=randomize_pose,
         )
 
-        # tree_id_str = f"{tree_namespace}{tree_type}_tree{tree_id}"
-        urdf_path = os.path.join(URDF_PATH, "trees", tree_type, "generated", f"{tree.id_str}.urdf")
+        tree_id_str = f"{tree_namespace}{tree_type}_tree{tree_id}"
+        # urdf_path = os.path.join(URDF_PATH, "trees", tree_type, "generated", f"{tree.id_str}.urdf")
 
         # Add tree to dict of trees
         self.trees[tree.id_str] = tree
-        return
+        return tree_id_str
 
     def activate_tree(
         self,
@@ -177,8 +177,8 @@ class PruningEnv(gym.Env):
             tree.pyb_tree_id = self.pbutils.pbclient.loadURDF(tree.urdf_path, useFixedBase=True)
             log.info(f"Tree {tree.id_str} activated with PyBID {tree.pyb_tree_id}")
 
-        if include_support_posts:
-            self.activate_support_posts(associated_tree=tree)
+            if include_support_posts:
+                self.activate_support_posts(associated_tree=tree)
         return
 
     def deactivate_tree(self, tree: Tree | None = None, tree_id_str: str | None = None) -> None:
