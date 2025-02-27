@@ -1,6 +1,6 @@
 robot_stack:
-    # - farm-ng
-    - cart
+    - amiga
+    # - cart
     # - linear_slider
     - ur5e
     - mock_pruner

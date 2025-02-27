@@ -54,7 +54,10 @@ class PyBUtils:
 
         # Set the viewing camera
         self.pbclient.resetDebugVisualizerCamera(
-            cameraDistance=1.56, cameraYaw=-120.3, cameraPitch=-12.48, cameraTargetPosition=[-0.3, -0.06, 1.0]
+            cameraDistance=1.56,
+            cameraYaw=-120.3,
+            cameraPitch=-12.48,
+            cameraTargetPosition=[-0.3, -0.06, 1.0],
         )
         self.create_background()
         # self.setup_bird_view_visualizer()
@@ -70,7 +73,13 @@ class PyBUtils:
         log.info(f"Gravity enabled ({-grav} m/s^2).")
         return
 
-    def create_wall_with_texture(self, wall_dim: List, wall_pos: List, euler_rotation: List, wall_texture: int):
+    def create_wall_with_texture(
+        self,
+        wall_dim: List,
+        wall_pos: List,
+        euler_rotation: List,
+        wall_texture: int,
+    ):
         wall_viz = self.pbclient.createVisualShape(
             shapeType=self.pbclient.GEOM_BOX,
             halfExtents=wall_dim,
@@ -95,7 +104,10 @@ class PyBUtils:
 
         self.floor_id = self.create_wall_with_texture([0.01, 5, 5], [0, 0, 0], [0, np.pi / 2, 0], self.wall_texture)
         self.wall_id = self.create_wall_with_texture(
-            [0.01, 5, 5], [0, -2, 5], [np.pi / 2, 0, np.pi / 2], self.wall_texture
+            [0.01, 5, 5],
+            [0, -2, 5],
+            [np.pi / 2, 0, np.pi / 2],
+            self.wall_texture,
         )
         self.side_wall_1_id = self.create_wall_with_texture([0.01, 5, 5], [-5, 0, 5], [0, 0, 0], self.wall_texture)
         self.side_wall_2_id = self.create_wall_with_texture([0.01, 5, 5], [5, 0, 5], [0, 0, 0], self.wall_texture)
@@ -175,8 +187,16 @@ class PyBUtils:
             self.add_debug_item(
                 "sphere",
                 "step",
-                lineFromXYZ=[loc[0] - dx * branch[0], loc[1] - dx * branch[1], loc[2] - dx * branch[2]],
-                lineToXYZ=[loc[0] + dx * branch[0], loc[1] + dx * branch[1], loc[2] + dx * branch[2]],
+                lineFromXYZ=[
+                    loc[0] - dx * branch[0],
+                    loc[1] - dx * branch[1],
+                    loc[2] - dx * branch[2],
+                ],
+                lineToXYZ=[
+                    loc[0] + dx * branch[0],
+                    loc[1] + dx * branch[1],
+                    loc[2] + dx * branch[2],
+                ],
                 lineColorRGB=[1, 1, 0],
                 lineWidth=200,
             )
@@ -193,7 +213,11 @@ class PyBUtils:
                 "sphere",
                 "step",
                 lineFromXYZ=[pos[0], pos[1], pos[2]],
-                lineToXYZ=[pos[0] + rot_mat[0][i] * dx, pos[1] + rot_mat[1][i] * dx, pos[2] + rot_mat[2][i] * dx],
+                lineToXYZ=[
+                    pos[0] + rot_mat[0][i] * dx,
+                    pos[1] + rot_mat[1][i] * dx,
+                    pos[2] + rot_mat[2][i] * dx,
+                ],
                 lineColorRGB=colors[i],
                 lineWidth=200,
             )

@@ -16,7 +16,7 @@ maintainers = [
     { name = "Luke Strohbehn", email = "luke.strohbehn@gmail.com" },
 ]
 description = "A PyBullet package for simulating trees with the UR5 arm."
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 dependencies = [
     "gymnasium",
     "modern_robotics",

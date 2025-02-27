@@ -11,6 +11,7 @@ from collections import defaultdict
 import glob
 import math
 import os
+from pathlib import Path
 import pickle
 from typing import Optional, Tuple, List
 import secrets
@@ -18,9 +19,13 @@ import numpy as np
 import pybullet
 import pywavefront
 from nptyping import NDArray, Shape, Float
+from numpy.typing import ArrayLike
 from pybullet_tree_sim import RGB_LABEL, URDF_PATH, MESHES_PATH, PKL_PATH
 from pybullet_tree_sim.utils.pyb_utils import PyBUtils
-from pybullet_tree_sim.utils.camera_helpers import compute_perpendicular_projection_vector
+from pybullet_tree_sim.utils.camera_helpers import (
+    compute_perpendicular_projection_vector,
+)
+from pybullet_tree_sim.utils import math_helpers as mh
 import pybullet_tree_sim.utils.xacro_utils as xutils
 from scipy.spatial.transform import Rotation
 import xacro
@@ -60,15 +65,15 @@ class Tree:
     def __init__(
         self,
         pbutils: PyBUtils,
-        id: int | None = None,
+        tree_id: int | None = None,
         tree_type: str | None = None,
         namespace: str = "",
         parent: str = "world",
         urdf_path: str | None = None,
         obj_path: str | None = None,
         labeled_tree_obj_path: str | None = None,
-        position=np.array([0, 0, 0]),
-        orientation=np.array([0, 0, 0, 1]),
+        position: np.ndarray = np.array([0, 0, 0]),
+        orientation: np.ndarray = np.array([0, 0, 0, 1]),
         scale: float = 1.0,
         randomize_pose: bool = False,
         verbose: bool = True,
@@ -84,29 +89,35 @@ class Tree:
         self.generator: np.random.Generator = np.random.default_rng(seed=self.seed)
         self.verbose = verbose
 
+        # Tree specific parameters
+        self.scale = scale
+        self.tree_namespace = namespace
+        self.tree_id = tree_id
+        self.tree_type = tree_type
+        self.id_str = self.create_id_string(tree_id=tree_id, tree_type=tree_type, namespace=namespace, urdf_path=urdf_path)
+        self.urdf_path = os.path.join(self._tree_generated_urdf_path, self.id_str+'.urdf')
+        self.mesh_path = os.path.join(self._tree_meshes_unlabeled_path, self.id_str+".obj")
+        self.labeled_mesh_path = os.path.join(self._tree_meshes_labeled_path, self.id_str+"_labeled.obj")
+        self.init_pos = position
+        self.init_orientation = orientation
+
+
+        log.info(f"__init__ {self.id_str}")
+
+
         # URDF
-        urdf_content, self.urdf_path = Tree.load_tree_urdf(
-            scale=scale, tree_id=id, tree_type=tree_type, namespace=namespace, parent=parent, tree_urdf_path=urdf_path
-        )
-        log.info(f"Tree URDF loaded: {self.urdf_path}")
+        self.load_tree_urdf(scale=scale, parent=parent)
         # OBJ
-        tree_obj = Tree.load_tree_obj(tree_id=id, tree_type=tree_type, namespace=namespace, tree_obj_path=obj_path)
+        tree_obj = self.load_tree_obj()
+        log.info(f"Tree mesh loaded: {self.mesh_path}")
         # Labelled OBJ
-        labeled_tree_obj = Tree.load_labeled_tree_obj(
-            tree_id=id, tree_type=tree_type, namespace=namespace, labeled_tree_obj_path=labeled_tree_obj_path
-        )
+        labeled_tree_obj = self.load_labeled_tree_obj()
 
         # Tree specific parameters
         self.rgb_label = RGB_LABEL
         self.pyb_tree_id = None
 
-        # Tree specific parameters
-        self.scale = scale
-        self.id = id
-        self.tree_type = tree_type
-        self.id_str = f"{namespace}{tree_type}_tree{id}"
-        self.init_pos = position
-        self.init_orientation = orientation
+
 
         # Set tree pose
         if randomize_pose:
@@ -135,7 +146,12 @@ class Tree:
             tree_obj_vertices_labeled.append(vertex + (vertex_to_label[vertex],))
 
         # # # TODO: begin() method or something
-        self.transformed_vertices = list(map(lambda x: self.transform_tree_obj_vertex(x), tree_obj_vertices_labeled))
+        self.transformed_vertices = list(
+            map(
+                lambda x: self.transform_tree_obj_vertex(x),
+                tree_obj_vertices_labeled,
+            )
+        )
 
         # if pickled file exists load and return
         path_component = os.path.normpath(self.urdf_path).split(os.path.sep)
@@ -168,6 +184,26 @@ class Tree:
         del self.vertex_and_projection
 
         return
+
+    def create_id_string(self,
+        tree_id: int | None = None,
+        tree_type: str | None = None,
+        namespace: str | None = None,
+        urdf_path: str | None = None
+    ) -> str:
+        if tree_id is None and urdf_path is None:
+            # log.error("Both urdf_path and tree parameters cannot be None.")
+            raise TreeException("Both urdf_path and tree parameters cannot be None.")
+
+        if urdf_path is None:
+            id_str = f"{namespace}_{tree_type}_tree{tree_id}"
+        else:
+            id_str = Path(urdf_path).stem
+            id_str_components = id_str.split('_')
+            self.tree_namespace = id_str_components[0]
+            self.tree_type = id_str_components[1]
+            self.tree_id = id_str_components[2]
+        return id_str
 
     def _load_points_from_pickle(self, pkl_path):
         with open(pkl_path, "rb") as f:
@@ -210,7 +246,12 @@ class Tree:
             for j in range(num_longitude_bins):
                 lon_min = np.rad2deg(-np.pi + j * bin_size)
                 lon_max = np.rad2deg(-np.pi + (j + 1) * bin_size)
-                bins[(round((lat_min + lat_max) / 2), round((lon_min + lon_max) / 2))] = []
+                bins[
+                    (
+                        round((lat_min + lat_max) / 2),
+                        round((lon_min + lon_max) / 2),
+                    )
+                ] = []
         return bins
 
     def transform_tree_obj_vertex(self, vertex: ArrayLike) -> Tuple[np.ndarray, float]:
@@ -247,11 +288,14 @@ class Tree:
             direction_vector = direction_vector / np.linalg.norm(direction_vector)
             lat_angle = np.rad2deg(np.arcsin(direction_vector[2])) + offset
             lon_angle = np.rad2deg(np.arctan2(direction_vector[1], direction_vector[0])) + offset
-            lat_angle_min = rounddown(lat_angle)
-            lat_angle_max = roundup(lat_angle)
-            lon_angle_min = rounddown(lon_angle)
-            lon_angle_max = roundup(lon_angle)
-            bin_key = (round((lat_angle_min + lat_angle_max) / 2), round((lon_angle_min + lon_angle_max) / 2))
+            lat_angle_min = mh.rounddown(lat_angle)
+            lat_angle_max = mh.roundup(lat_angle)
+            lon_angle_min = mh.rounddown(lon_angle)
+            lon_angle_max = mh.roundup(lon_angle)
+            bin_key = (
+                round((lat_angle_min + lat_angle_max) / 2),
+                round((lon_angle_min + lon_angle_max) / 2),
+            )
             # if bin_key[0] not in between -85 and 85 set as 85 or -85
             # if bin_keyp[1] not in between -175 and 175 set as 175 or -175
 
@@ -331,7 +375,7 @@ class Tree:
             scale = np.random.uniform()
             tree_point = (1 - scale) * self.transformed_vertices[ab[0]][0] + scale * self.transformed_vertices[ab[1]][0]
 
-            # Label the face as the majority label of the vertices
+            # Label the face as the majority label of the verticesp
             labels = [
                 self.transformed_vertices[ab[0]][1],
                 self.transformed_vertices[ab[1]][1],
@@ -362,14 +406,20 @@ class Tree:
 
     def filter_outliers(self):
         # Filter out outliers
-        print("Number of points before filtering: ", len(self.vertex_and_projection))
+        print(
+            "Number of points before filtering: ",
+            len(self.vertex_and_projection),
+        )
         self.vertex_and_projection = list(
             filter(
                 lambda x: np.linalg.norm(x[1]) > self.projection_mean + 0.5 * self.projection_std,
                 self.vertex_and_projection,
             )
         )
-        print("Number of points after filtering: ", len(self.vertex_and_projection))
+        print(
+            "Number of points after filtering: ",
+            len(self.vertex_and_projection),
+        )
         return
 
     def filter_points_below_base(self, base_xyz):
@@ -379,24 +429,108 @@ class Tree:
 
     def filter_trunk_points(self):
         self.vertex_and_projection = list(
-            filter(lambda x: abs(x[0][0] - self.pos[0]) > 0.8, self.vertex_and_projection)
+            filter(
+                lambda x: abs(x[0][0] - self.pos[0]) > 0.8,
+                self.vertex_and_projection,
+            )
         )
-        print("Number of points after filtering trunk points: ", len(self.vertex_and_projection))
+        print(
+            "Number of points after filtering trunk points: ",
+            len(self.vertex_and_projection),
+        )
         return
+
+    def load_tree_urdf(
+        self,
+        scale: float,
+        parent: str = "world",
+        position: str = "0.0 0.0 0.0",
+        orientation: str = "0.0 0.0 0.0",
+        save_urdf: bool = True,
+        regenerate_urdf: bool = False,  # TODO: make save/regenerate work well together. Will need to add delete URDF function
+    ) -> None:
+        """Load a tree URDF from a given path or generate a tree URDF from a xacro file. Returns the URDF content.
+        If `tree_urdf_path` is not None, then load that URDF.
+        Otherwise, process an xacro file with given input parameters.
+
+        Returns
+        -------
+            None
+        """
+        if not os.path.exists(self.urdf_path):
+            log.info(f"Could not find file '{self.urdf_path}'. Generating URDF from xacro.")
+
+            if not os.path.isdir(Tree._tree_generated_urdf_path):
+                os.mkdir(Tree._tree_generated_urdf_path)
+
+                urdf_mappings = {
+                    "namespace": self.tree_namespace,
+                    "tree_id": str(self.tree_id),
+                    "tree_type": self.tree_type,
+                    "parent": parent,
+                    "xyz": position,
+                    "rpy": orientation,
+                }
+                # If the tree macro information doesn't describe a generated file, generate it using the generic tree xacro.
+                urdf_content = xutils.load_urdf_from_xacro(
+                    xacro_path=Tree._tree_xacro_path, mappings=urdf_mappings
+                ).toprettyxml()
+                if save_urdf:
+                    xutils.save_urdf(urdf_content=urdf_content, urdf_path=self.urdf_path)
+                    log.info(f"Saved URDF to file '{self.urdf_path}'.")
+        else:
+            urdf_content = xutils.load_urdf_from_xacro(xacro_path=self.urdf_path).toprettyxml()
+            log.info(f"Loaded URDF from file '{self.urdf_path}'.")
+
+        return
+
+    def load_tree_obj(self):
+        if not os.path.exists(self.mesh_path):
+            raise TreeException(f"Could not find file '{self.mesh_path}.")
+        tree_obj = pywavefront.Wavefront(self.mesh_path, create_materials=True, collect_faces=True)
+        return tree_obj
+
+    def load_labeled_tree_obj(self):
+        if not os.path.exists(self.labeled_mesh_path):
+            raise TreeException(f"Could not find the file {self.labeled_mesh_path}")
+        labeled_tree_obj = pywavefront.Wavefront(self.labeled_mesh_path, create_materials=True, collect_faces=True)
+        return labeled_tree_obj
+
+    @staticmethod
+    def make_trees_from_ids(
+        pbutils: PyBUtils,
+        tree_ids: list[int],
+        namespace: str = '',
+        pos: np.ndarray = np.array([0,0,0]),
+        orientation: np.ndarray = np.array([0,0,0,1]),
+        scale: float = 1.0,
+        randomize_pose: bool = False
+    ) -> list[Tree]:
+        trees: list[Tree] = []
+
+        for tree_id in tree_ids:
+            trees.append(
+                Tree(
+                    pbutils=pbutils,
+                    tree_id=tree_id,
+
+                )
+            )
+        return trees
 
     @staticmethod
     def make_trees_from_folder(
+        pbutils: PyBUtils,
         trees_urdf_path: str,
         trees_obj_path: str,
         trees_labelled_path: str,
-        pos: NDArray,
-        orientation: NDArray,
-        scale: int,
-        num_points: int,
+        pos: np.ndarray,
+        orientation: np.ndarray,
+        scale: float,
         num_trees: int,
         randomize_pose: bool = False,
-    ) -> List:
-        trees: List[Tree] = []
+    ) -> list[Tree]:
+        trees: list[Tree] = []
         # for urdfs, objs in zip(
         #     sorted(glob.glob(trees_urdf_path + "/*.urdf")), sorted(glob.glob(trees_obj_path + "/*.obj"))
         # ):
@@ -410,152 +544,26 @@ class Tree:
         #             pos=pos,
         #             orientation=orientation,
         #             scale=scale,
-        #             # num_points=num_points,
         #             randomize_pose=randomize_pose,
         #         )
         #     )
 
+        # self,
+        # pbutils: PyBUtils,
+        # tree_id: int | None = None,
+        # tree_type: str | None = None,
+        # namespace: str = "",
+        # parent: str = "world",
+        # urdf_path: str | None = None,
+        # obj_path: str | None = None,
+        # labeled_tree_obj_path: str | None = None,
+        # position=np.array([0, 0, 0]),
+        # orientation=np.array([0, 0, 0, 1]),
+        # scale: float = 1.0,
+        # randomize_pose: bool = False,
+        # verbose: bool = True,
+        # seed: int | None = None,
         return trees
-
-    @staticmethod
-    def load_tree_urdf(
-        scale: float,
-        tree_id: int | None = None,
-        tree_type: str | None = None,
-        # pos: NDArray,
-        # orientation: NDArray,
-        tree_urdf_path: str | None = None,
-        namespace: str = "",
-        parent: str = "world",
-        position: str = "0.0 0.0 0.0",
-        orientation: str = "0.0 0.0 0.0",
-        save_urdf: bool = True,
-        regenerate_urdf: bool = False,  # TODO: make save/regenerate work well together. Will need to add delete URDF function
-    ) -> tuple[str, str]:
-        """Load a tree URDF from a given path or generate a tree URDF from a xacro file. Returns the URDF content.
-        If `tree_urdf_path` is not None, then load that URDF.
-        Otherwise, process an xacro file with given input parameters.
-
-        Returns the URDF content and the URDF path.
-        """
-
-        if tree_urdf_path is None:
-            if type is None or tree_id is None:
-                raise TreeException(
-                    "If parameter 'tree_urdf_path' is not provided, namespace, type, and id must be provided."
-                )
-            urdf_path = os.path.join(Tree._tree_generated_urdf_path, f"{namespace}{tree_type}_tree{tree_id}.urdf")
-            if not os.path.exists(urdf_path):
-                log.info(f"Could not find file '{urdf_path}'. Generating URDF from xacro.")
-
-                if not os.path.isdir(Tree._tree_generated_urdf_path):
-                    os.mkdir(Tree._tree_generated_urdf_path)
-
-                urdf_mappings = {
-                    "namespace": namespace,
-                    "tree_id": str(tree_id),
-                    "tree_type": tree_type,
-                    "parent": parent,
-                    "xyz": position,
-                    "rpy": orientation,
-                }
-                # If the tree macro information doesn't describe a generated file, generate it using the generic tree xacro.
-                urdf_content = xutils.load_urdf_from_xacro(
-                    xacro_path=Tree._tree_xacro_path, mappings=urdf_mappings
-                ).toprettyxml()
-                xutils.save_urdf(urdf_content=urdf_content, urdf_path=urdf_path)
-                log.info(f"Saved URDF to file '{urdf_path}'.")
-            else:
-                urdf_content = xutils.load_urdf_from_xacro(xacro_path=urdf_path).toprettyxml()
-                log.info(f"Loaded URDF from file '{urdf_path}'.")
-                return (urdf_content, urdf_path)
-        else:
-            urdf_mappings = None
-            urdf_path = tree_urdf_path
-            urdf_content = xutils.load_urdf_from_xacro(xacro_path=urdf_path, mappings=urdf_mappings).toprettyxml()
-        return (urdf_content, urdf_path)
-
-    @staticmethod
-    def load_tree_obj(
-        tree_id: int | None = None, tree_type: str | None = None, namespace: str = "", tree_obj_path: str | None = None
-    ):
-
-        if tree_obj_path is None:
-            if tree_type is None or tree_id is None:
-                raise TreeException(
-                    "If paramter 'tree_obj_path' is not provided, namespace, type, and id must be provided."
-                )
-            _obj_file = os.path.join(Tree._tree_meshes_unlabeled_path, f"{namespace}{tree_type}_tree{tree_id}.obj")
-            if not os.path.exists(_obj_file):
-                raise TreeException(
-                    f"Tree with namespace '{namespace}', type {tree_type}, and id {tree_id} does not exist."
-                )
-            else:
-                obj_path = _obj_file
-
-        else:
-            obj_path = tree_obj_path
-        # Load the tree object
-        tree_obj = pywavefront.Wavefront(obj_path, create_materials=True, collect_faces=True)
-        return tree_obj
-
-    @staticmethod
-    def load_labeled_tree_obj(
-        tree_id: int | None = None,
-        tree_type: str | None = None,
-        namespace: str = "",
-        labeled_tree_obj_path: str | None = None,
-    ):
-        if labeled_tree_obj_path is None:
-            if tree_type is None or tree_id is None:
-                raise TreeException(
-                    "If labeled_tree_obj_path is not provided, namespace, type, and id must be provided."
-                )
-            _obj_file = os.path.join(
-                Tree._tree_meshes_labeled_path, f"{namespace}{tree_type}_labeled_tree{tree_id}.obj"
-            )
-            if not os.path.exists(_obj_file):
-                log.info(f"Could not find file '{_obj_file}'.")
-                raise TreeException(
-                    f"labeled_tree_obj_path with namespace '{namespace}', type '{tree_type}', and id '{tree_id}' does not exist."
-                )
-            else:
-                labeled_tree_obj_path = _obj_file
-
-        labeled_tree_obj = pywavefront.Wavefront(labeled_tree_obj_path, create_materials=True, collect_faces=True)
-        return labeled_tree_obj
-
-    @staticmethod
-    def create_tree(
-        pbutils: PyBUtils,
-        scale: float,
-        tree_id: int | None = None,
-        tree_type: str | None = None,
-        # pos: NDArray,
-        # orientation: NDArray,
-        tree_urdf_path: str | None = None,
-        namespace: str = "",
-        parent: str = "world",
-        position: ArrayLike = [0, 0, 0],
-        orientation: ArrayLike = [0, 0, 0, 1],
-        randomize_pose: bool = False,
-    ) -> Tree:
-        """TODO: Delete this function, just create tree object"""
-
-        tree = Tree(
-            pbutils=pbutils,
-            id=tree_id,
-            tree_type=tree_type,
-            namespace=namespace,
-            parent=parent,
-            urdf_path=tree_urdf_path,
-            position=position,
-            orientation=orientation,
-            randomize_pose=randomize_pose,
-            # obj_path=os.path.join(Tree._tree_meshes_path, f"{namespace}{tree_type}_tree{tree_id}.obj")
-        )
-
-        return tree
 
 
 def main():

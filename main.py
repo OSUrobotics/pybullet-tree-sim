@@ -10,32 +10,39 @@ import secrets
 import time
 from zenlog import log
 
+from scipy.spatial.transform import Rotation
+
 
 def main():
     pbutils = PyBUtils(renders=True)
-
-    robot = Robot(pbclient=pbutils.pbclient, position=[0, 1, 0], orientation=[0, 0, 0, 1])
+    robot_start_orientation = Rotation.from_euler('xyz', [0, 0,180], degrees=True).as_quat()
+    robot = Robot(pbclient=pbutils.pbclient, position=[0, 1, 0], orientation=robot_start_orientation)
 
     penv = PruningEnv(
         pbutils=pbutils,
         verbose=True,
     )
 
-    _1_inch = 0.0254
-    penv.activate_shape(shape="cylinder", radius=_1_inch * 2, height=2.85, orientation=[0, np.pi / 2, 0])
+    # _1_inch = 0.0254
+    # penv.activate_shape(
+    #     shape="cylinder",
+    #     radius=_1_inch * 2,
+    #     height=2.85,
+    #     orientation=[0, np.pi / 2, 0],
+    # )
     # penv.activate_shape(shape="cylinder", radius=0.01, height=2.85, orientation=[0, np.pi / 2, 0])
 
-    # penv.load_tree(
-    #     pbutils=pbutils,
-    #     scale=1.0,
-    #     tree_id=1,
-    #     tree_type="envy",
-    #     tree_namespace="LPy_",
-    #     # tree_urdf_path=os.path.join(URDF_PATH, "trees", "envy", "generated", "LPy_envy_tree0.urdf"),
-    #     save_tree_urdf=False,
-    #     # randomize_pose=True
-    # )
-    # penv.activate_tree(tree_id_str="LPy_envy_tree1")
+    tree_name = penv.load_tree(
+        pbutils=pbutils,
+        scale=1.0,
+        tree_id=2,
+        tree_type="envy",
+        tree_namespace="LPy",
+        # tree_urdf_path=os.path.join(URDF_PATH, "trees", "envy", "generated", "LPy_envy_tree0.urdf"),
+        save_tree_urdf=False,
+        # randomize_pose=True
+    )
+    penv.activate_tree(tree_id_str=tree_name)
 
     # # Run the sim a little just to get the environment properly loaded.
     for i in range(100):
@@ -49,11 +56,15 @@ def main():
             # log.debug(f"{robot.sensors['tof0']}")
             tof0_view_matrix = robot.get_view_mat_at_curr_pose(camera=robot.sensors["tof0"])
             tof0_rgbd = robot.get_rgbd_at_cur_pose(
-                camera=robot.sensors["tof0"], type="sensor", view_matrix=tof0_view_matrix
+                camera=robot.sensors["tof0"],
+                type="sensor",
+                view_matrix=tof0_view_matrix,
             )
             tof1_view_matrix = robot.get_view_mat_at_curr_pose(camera=robot.sensors["tof1"])
             tof1_rgbd = robot.get_rgbd_at_cur_pose(
-                camera=robot.sensors["tof1"], type="sensor", view_matrix=tof1_view_matrix
+                camera=robot.sensors["tof1"],
+                type="sensor",
+                view_matrix=tof1_view_matrix,
             )
             # tof0_view_matrix = np.asarray(tof0_view_matrix).reshape((4, 4), order="F")
             # log.debug(f"{tof0_view_matrix[:3, 3]}")
