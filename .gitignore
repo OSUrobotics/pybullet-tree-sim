@@ -168,5 +168,6 @@ cython_debug/
 
 # Don't upload pkl files
 *.pkl
+pkl/
 
 meshes/
