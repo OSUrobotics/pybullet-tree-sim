@@ -170,4 +170,4 @@ cython_debug/
 *.pkl
 pkl/
 
-meshes/
+meshes*/

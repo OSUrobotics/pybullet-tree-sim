@@ -15,7 +15,7 @@ from scipy.spatial.transform import Rotation
 
 def main():
     pbutils = PyBUtils(renders=True)
-    robot_start_orientation = Rotation.from_euler('xyz', [0, 0,180], degrees=True).as_quat()
+    robot_start_orientation = Rotation.from_euler("xyz", [0, 0, 180], degrees=True).as_quat()
     robot = Robot(pbclient=pbutils.pbclient, position=[0, 1, 0], orientation=robot_start_orientation)
 
     penv = PruningEnv(
@@ -42,7 +42,7 @@ def main():
         save_tree_urdf=False,
         # randomize_pose=True
     )
-    penv.activate_tree(tree_id_str=tree_name)
+    penv.activate_tree_by_id_str(tree_id_str=tree_name)
 
     # # Run the sim a little just to get the environment properly loaded.
     for i in range(100):

@@ -69,7 +69,7 @@ class PruningEnv(gym.Env):
         # make_trees: bool = False,
         name: str = "PruningEnv",
         # num_trees: int | None = None,
-        renders: bool = False,
+        # renders: bool = False,
         verbose: bool = True,
     ) -> None:
         """Initialize the Pruning Environment
@@ -83,7 +83,7 @@ class PruningEnv(gym.Env):
 
         # Pybullet GUI variables
         self.render_mode = "rgb_array"
-        self.renders = renders
+        # self.renders = renders
         # self.eval = evaluate
 
         # Gym variables
@@ -143,17 +143,20 @@ class PruningEnv(gym.Env):
             randomize_pose=randomize_pose,
         )
 
-        tree_id_str = f"{tree_namespace}{tree_type}_tree{tree_id}"
-        # urdf_path = os.path.join(URDF_PATH, "trees", tree_type, "generated", f"{tree.id_str}.urdf")
-
         # Add tree to dict of trees
         self.trees[tree.id_str] = tree
-        return tree_id_str
+        return tree.id_str
+
+    def get_tree_from_id_str(self, tree_id_str: str) -> Tree:
+        try:
+            tree = self.trees[tree_id_str]
+        except KeyError as e:
+            raise TreeException(f"{e}: Tree with ID {tree_id_str} not found")
+        return tree
 
     def activate_tree(
         self,
-        tree: Tree | None = None,
-        tree_id_str: str | None = None,
+        tree: Tree,
         include_support_posts: bool = True,
     ) -> None:
         """Activate a tree by object or by tree_id_str. Can include support posts. Must provide either a Tree or tree_id_str.
@@ -161,43 +164,33 @@ class PruningEnv(gym.Env):
         @param tree_id_str (str/None): String including the identification characteristics of the tree.
         @return None
         """
-
-        if tree is None and tree_id_str is None:
-            raise TreeException("Parameters 'tree' and 'tree_id_str' cannot both be None")
-
-        if tree is None and tree_id_str is not None:
-            try:
-                tree = self.trees[tree_id_str]
-            except KeyError as e:
-                raise TreeException(f"{e}: Tree with ID {tree_id_str} not found")
-
-        if tree is not None:
+        if tree:
             if self.verbose:
                 log.info("Activating tree")
-            tree.pyb_tree_id = self.pbutils.pbclient.loadURDF(tree.urdf_path, useFixedBase=True)
-            log.info(f"Tree {tree.id_str} activated with PyBID {tree.pyb_tree_id}")
+            tree.pyb_id = self.pbutils.pbclient.loadURDF(tree.urdf_path, useFixedBase=True)
+            log.info(f"Tree {tree.id_str} activated with PyBID {tree.pyb_id}")
 
             if include_support_posts:
                 self.activate_support_posts(associated_tree=tree)
         return
 
-    def deactivate_tree(self, tree: Tree | None = None, tree_id_str: str | None = None) -> None:
-        """Deactivate a tree by object or by tree_id_str"""
-        if tree is None and tree_id_str is None:
-            raise TreeException("Parameters 'tree' and 'tree_id_str' cannot both be None")
+    def activate_tree_by_id_str(self, tree_id_str: str, include_support_posts: bool = True) -> None:
+        tree = self.get_tree_from_id_str(tree_id_str=tree_id_str)
+        self.activate_tree(tree=tree, include_support_posts=include_support_posts)
+        return
 
-        if tree is None and tree_id_str is not None:
-            try:
-                tree = self.trees[tree_id_str]
-            except KeyError as e:
-                raise TreeException(f"{e}: Tree with ID {tree_id_str} not found")
+    def deactivate_tree(self, tree: Tree) -> None:
+        """Deactivate a tree object"""
+        try:
+            self.pbutils.pbclient.removeBody(tree.pyb_id)
+            log.info(f"Tree {tree.id_str} with PyBID {tree.pyb_id} deactivated")
+        except Exception as e:
+            log.error(f"Error deactivating tree: {e}")
+        return
 
-        if tree is not None:
-            try:
-                self.pbutils.pbclient.removeBody(tree.pyb_tree_id)
-                log.info(f"Tree {tree.id_str} with PyBID {tree.pyb_tree_id} deactivated")
-            except Exception as e:
-                log.error(f"Error deactivating tree: {e}")
+    def deactivate_tree_by_id_str(self, tree_id_str: str) -> None:
+        tree = self.get_tree_from_id_str(tree_id_str=tree_id_str)
+        self.deactivate_tree(tree=tree)
         return
 
     def activate_support_posts(
