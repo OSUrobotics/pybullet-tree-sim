@@ -44,7 +44,7 @@ class Robot:
         self.position = position
         self.orientation = orientation
         self.randomize_pose = randomize_pose  # TODO: This isn't set up anymore... fix
-        self.init_joint_angles = (
+        self.init_joint_angles = (  # TODO: dynamically assign from defaults (i.e. if linear-slider is loaded in)
             (
                 -np.pi / 2 + np.pi / 4,
                 -np.pi * 2 / 3,
@@ -172,6 +172,7 @@ class Robot:
     def _get_joints(self) -> dict:
         """Return a dict of joint information for the robot"""
         joints = {}
+
         for i in range(self.num_joints):
             info = self.pbclient.getJointInfo(self.robot, i)
             joint_name = info[1].decode("utf-8")
@@ -187,16 +188,25 @@ class Robot:
                     }
                 }
             )
+        log.warn(joints)
         return joints
 
-    def _assign_control_joints(self, joints: dict) -> list:
+    def _assign_control_joints(self, joints: dict) -> tuple[list]:
         """Get list of controllable joints from the joint dict by joint type"""
         control_joints = []
         control_joint_idxs = []
+        self.control_joint_lower_limits = []
+        self.control_joint_upper_limits = []
+        self.control_joint_ranges = []
         for joint, joint_info in joints.items():
             if joint_info["type"] == 0:  # TODO: Check if this works for prismatic joints or just revolute
                 control_joints.append(joint)
                 control_joint_idxs.append(joint_info["id"])
+
+                # self.joint_upper_limits,
+                # self.joint_lower_limits,
+                # self.joint_ranges,  # ,
+
         return control_joints, control_joint_idxs
 
     def _get_links(self) -> dict:
@@ -323,6 +333,7 @@ class Robot:
             else joint_angles
         )
         self.set_joint_angles_no_collision(self.init_joint_angles)
+        # self.pbclient.resetJointState() # TODO Fill out
         return
 
     def remove_robot(self):
@@ -565,7 +576,7 @@ class Robot:
             collisons_self = self.pbclient.getContactPoints(bodyA=self.robot, bodyB=self.robot)
             collisions_unacceptable = collisons_self
             for i in range(len(collisions_unacceptable)):
-                if collisions_unacceptable[i][-6] < -0.001:
+                if collisions_unacceptable[i][-6] < -0.00:
                     collision_info["collisions_unacceptable"] = True
                     break
         if self.verbose > 1:
@@ -578,7 +589,7 @@ class Robot:
 
     def check_success_collision(self, body_b) -> bool:
         """Check if there are any collisions between the robot and the environment
-        Returns: Boolw
+        Returns: Bool
         """
         collisions_success = self.pbclient.getContactPoints(
             bodyA=self.robot, bodyB=body_b, linkIndexA=self.success_link_index
