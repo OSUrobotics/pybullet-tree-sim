@@ -18,7 +18,8 @@ import secrets
 import numpy as np
 import pybullet
 import pywavefront
-from nptyping import NDArray, Shape, Float
+
+# from nptyping import NDArray, Shape, Float
 from numpy.typing import ArrayLike
 from pybullet_tree_sim import RGB_LABEL, URDF_PATH, MESHES_PATH, PKL_PATH
 from pybullet_tree_sim.utils.pyb_utils import PyBUtils
@@ -94,30 +95,26 @@ class Tree:
         self.tree_namespace = namespace
         self.tree_id = tree_id
         self.tree_type = tree_type
-        self.id_str = self.create_id_string(tree_id=tree_id, tree_type=tree_type, namespace=namespace, urdf_path=urdf_path)
-        self.urdf_path = os.path.join(self._tree_generated_urdf_path, self.id_str+'.urdf')
-        self.mesh_path = os.path.join(self._tree_meshes_unlabeled_path, self.id_str+".obj")
-        self.labeled_mesh_path = os.path.join(self._tree_meshes_labeled_path, self.id_str+"_labeled.obj")
+        self.id_str = self.create_id_string(
+            tree_id=tree_id, tree_type=tree_type, namespace=namespace, urdf_path=urdf_path
+        )
+        self.urdf_path = os.path.join(self._tree_generated_urdf_path, self.id_str + ".urdf")
+        self.mesh_path = os.path.join(self._tree_meshes_unlabeled_path, self.id_str + ".obj")
+        self.labeled_mesh_path = os.path.join(self._tree_meshes_labeled_path, self.id_str + "_labeled.obj")
         self.init_pos = position
         self.init_orientation = orientation
-
-
-        log.info(f"__init__ {self.id_str}")
-
 
         # URDF
         self.load_tree_urdf(scale=scale, parent=parent)
         # OBJ
         tree_obj = self.load_tree_obj()
-        log.info(f"Tree mesh loaded: {self.mesh_path}")
-        # Labelled OBJ
+        # Labeled OBJ
         labeled_tree_obj = self.load_labeled_tree_obj()
 
         # Tree specific parameters
         self.rgb_label = RGB_LABEL
-        self.pyb_tree_id = None
-
-
+        # PyBullet parameters
+        self.pyb_id: int = None
 
         # Set tree pose
         if randomize_pose:
@@ -185,24 +182,28 @@ class Tree:
 
         return
 
-    def create_id_string(self,
+    def create_id_string(
+        self,
         tree_id: int | None = None,
         tree_type: str | None = None,
         namespace: str | None = None,
-        urdf_path: str | None = None
+        urdf_path: str | None = None,
     ) -> str:
         if tree_id is None and urdf_path is None:
             # log.error("Both urdf_path and tree parameters cannot be None.")
             raise TreeException("Both urdf_path and tree parameters cannot be None.")
 
+        if tree_id is not None:
+            tree_id = str(tree_id).zfill(5)
+
         if urdf_path is None:
-            id_str = f"{namespace}_{tree_type}_tree{tree_id}"
+            id_str = f"{namespace}_{tree_type}_{tree_id}"
         else:
             id_str = Path(urdf_path).stem
-            id_str_components = id_str.split('_')
+            id_str_components = id_str.split("_")
             self.tree_namespace = id_str_components[0]
             self.tree_type = id_str_components[1]
-            self.tree_id = id_str_components[2]
+            self.tree_id = str(id_str_components[2]).zfill(5)
         return id_str
 
     def _load_points_from_pickle(self, pkl_path):
@@ -448,10 +449,8 @@ class Tree:
         orientation: str = "0.0 0.0 0.0",
         save_urdf: bool = True,
         regenerate_urdf: bool = False,  # TODO: make save/regenerate work well together. Will need to add delete URDF function
-    ) -> None:
-        """Load a tree URDF from a given path or generate a tree URDF from a xacro file. Returns the URDF content.
-        If `tree_urdf_path` is not None, then load that URDF.
-        Otherwise, process an xacro file with given input parameters.
+    ) -> str:
+        """Load a tree URDF from a given path or generate a tree URDF from a xacro file. If content is generated, by default saves the content to /urdf/trees/<tree_type>/generated Returns the URDF content.
 
         Returns
         -------
@@ -463,34 +462,37 @@ class Tree:
             if not os.path.isdir(Tree._tree_generated_urdf_path):
                 os.mkdir(Tree._tree_generated_urdf_path)
 
-                urdf_mappings = {
-                    "namespace": self.tree_namespace,
-                    "tree_id": str(self.tree_id),
-                    "tree_type": self.tree_type,
-                    "parent": parent,
-                    "xyz": position,
-                    "rpy": orientation,
-                }
-                # If the tree macro information doesn't describe a generated file, generate it using the generic tree xacro.
-                urdf_content = xutils.load_urdf_from_xacro(
-                    xacro_path=Tree._tree_xacro_path, mappings=urdf_mappings
-                ).toprettyxml()
-                if save_urdf:
-                    xutils.save_urdf(urdf_content=urdf_content, urdf_path=self.urdf_path)
-                    log.info(f"Saved URDF to file '{self.urdf_path}'.")
+            _tree_id = str(self.tree_id).zfill(5)
+            urdf_mappings = {
+                "namespace": self.tree_namespace,
+                "tree_id": _tree_id,
+                "tree_type": self.tree_type,
+                "parent": parent,
+                "xyz": position,
+                "rpy": orientation,
+            }
+
+            # If the tree macro information doesn't describe a generated file, generate it using the generic tree xacro.
+            urdf_content = xutils.load_urdf_from_xacro(
+                xacro_path=Tree._tree_xacro_path, mappings=urdf_mappings
+            ).toprettyxml()
+            if save_urdf:
+                xutils.save_urdf(urdf_content=urdf_content, urdf_path=self.urdf_path)
         else:
             urdf_content = xutils.load_urdf_from_xacro(xacro_path=self.urdf_path).toprettyxml()
             log.info(f"Loaded URDF from file '{self.urdf_path}'.")
 
-        return
+        return urdf_content
 
     def load_tree_obj(self):
+        """Loads a mesh .obj mesh file with its path defined by the tree_id_str"""
         if not os.path.exists(self.mesh_path):
             raise TreeException(f"Could not find file '{self.mesh_path}.")
         tree_obj = pywavefront.Wavefront(self.mesh_path, create_materials=True, collect_faces=True)
         return tree_obj
 
     def load_labeled_tree_obj(self):
+        """Loads a labeled mesh .obj mesh file with its path defined by the tree_id_str"""
         if not os.path.exists(self.labeled_mesh_path):
             raise TreeException(f"Could not find the file {self.labeled_mesh_path}")
         labeled_tree_obj = pywavefront.Wavefront(self.labeled_mesh_path, create_materials=True, collect_faces=True)
@@ -500,11 +502,11 @@ class Tree:
     def make_trees_from_ids(
         pbutils: PyBUtils,
         tree_ids: list[int],
-        namespace: str = '',
-        pos: np.ndarray = np.array([0,0,0]),
-        orientation: np.ndarray = np.array([0,0,0,1]),
+        namespace: str = "",
+        pos: np.ndarray = np.array([0, 0, 0]),
+        orientation: np.ndarray = np.array([0, 0, 0, 1]),
         scale: float = 1.0,
-        randomize_pose: bool = False
+        randomize_pose: bool = False,
     ) -> list[Tree]:
         trees: list[Tree] = []
 
@@ -513,7 +515,6 @@ class Tree:
                 Tree(
                     pbutils=pbutils,
                     tree_id=tree_id,
-
                 )
             )
         return trees
