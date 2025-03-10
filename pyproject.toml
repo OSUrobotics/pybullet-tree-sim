@@ -2,6 +2,14 @@
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+# [tool.hatch.metadata]
+# allow-direct-references = true
+
+# [tool.hatch.build.hooks.custom]
+# path = "pybullet_tree_sim/utils/mesh_downloader.py"
+
+
+
 [project]
 name = "pybullet_tree_sim"
 version = "0.0.1"
@@ -28,7 +36,12 @@ dependencies = [
     "pybullet==3.2.6",
     "pywavefront",
     "pyyaml",
+    'requests',
     "scikit-image",
+    'tqdm',
     "xacro",
     "zenlog",
 ]
+
+[project.scripts]
+mesh_downloader = 'pybullet_tree_sim.utils.mesh_downloader:main'
