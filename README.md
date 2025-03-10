@@ -2,16 +2,34 @@
 ## Using this package
 
 ### Installation
+
+#### Docker
+If using Ubuntu, you may skip this step. All other distributions must create a Docker environment. This container includes ROS2 Humble.
+
+```
+docker run -it --net=host --device /dev/dri/ -e DISPLAY=$DISPLAY -v $HOME/.Xauthority:/root/.Xauthority:ro osrf/ros:humble-desktop
+```
+
+After the docker environment has downloaded, update the system and download the UR robot drivers:
+```
+apt update -y && apt upgrade -y
+apt install python3-venv -y
+apt install ros-$ROS_DISTRO-ur -y
+cd ~
+```
+
+
+#### Installing this package
 1. Clone this repository into your local directory:
 ```
-git clone git@github.com:OSUrobotics/pybullet-tree-sim.git
+git clone https://github.com/OSUrobotics/pybullet-tree-sim.git
 ```
 2. Create a virtual environment. Python's `venv` is encouraged:
 ```
+cd pybullet-tree-sim
 python3 -m venv venv
 source venv/bin/activate
 ```
-Windows users should activate using the Windows-specific venv scripts.
 
 3. Install using pip:
 ```
@@ -25,6 +43,7 @@ If successfully installed, a CLI arg `mesh_downloader` should now be active in y
 mesh_downloader
 ```
 This command will extract the zip file for you. It is a large file and will take several minutes.
+
 
 ### Adding trees
 All trees should be defined by their origin namespace, the tree type, and the tree id. Tree ids should be zero-padded by 5 spaces.
