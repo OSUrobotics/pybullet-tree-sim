@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
+from pybullet_tree_sim import PROJECT_PATH
+
 import os
 import requests
 from tqdm import tqdm
 import zipfile
 
 
-_here = os.path.abspath(__file__)
-lib_path = os.path.dirname(os.path.dirname(_here))
-meshes_path = os.path.join(lib_path, "meshes")
+proj_src_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(PROJECT_PATH)))))
+meshes_path = os.path.join(proj_src_path, "pybullet_tree_sim", "meshes")
 
 
 def get_filename_from_url(url: str) -> str:
@@ -25,7 +26,7 @@ def is_download_needed(target_file_path: str) -> bool:
         if not os.path.isfile(os.path.join(meshes_path, "pybullet-tree-sim-meshes.zip")):  # TODO: pass name into func
             return True
         else:
-            print(f"File {os.path.join(meshes_path, "pybullet-tree-sim-meshes.zip")} already exists")
+            print(f"File {os.path.join(meshes_path, 'pybullet-tree-sim-meshes.zip')} already exists")
             return False
     else:
         print(f"Path {os.path.join(meshes_path, 'trees')} already exists.")
