@@ -16,10 +16,23 @@ apt update -y && apt upgrade -y
 apt install python3-venv -y
 apt install ros-$ROS_DISTRO-ur -y
 cd ~
+source /opt/ros/humble/setup.bash
 ```
 
 
+#### Installing dependencies
+1. Install support packages for the pruning environment.
+```
+cd ~
+git clone https://github.com/lukestroh/branch_detection_ws.git
+cd branch_detection_ws
+colcon build --symlink-install
+source install/setup.bash
+cd ~
+```
+
 #### Installing this package
+
 1. Clone this repository into your local directory:
 ```
 git clone https://github.com/OSUrobotics/pybullet-tree-sim.git
