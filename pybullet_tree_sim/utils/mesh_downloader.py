@@ -17,14 +17,18 @@ def get_filename_from_url(url: str) -> str:
 
 def is_download_needed(target_file_path: str) -> bool:
     if not os.path.exists(meshes_path):
+        print(f"Creating path {meshes_path}")
         os.mkdir(meshes_path)
         return True
+
     if not os.path.exists(os.path.join(meshes_path, "trees")):
         if not os.path.isfile(os.path.join(meshes_path, "pybullet-tree-sim-meshes.zip")):  # TODO: pass name into func
             return True
         else:
+            print(f"File {os.path.join(meshes_path, "pybullet-tree-sim-meshes.zip")} already exists")
             return False
     else:
+        print(f"Path {os.path.join(meshes_path, 'trees')} already exists.")
         return False
 
 
@@ -58,8 +62,13 @@ def download_file(url: str, target_file_path: str) -> bool:
 
 
 def unzip(zip_file: str):
+    print(f"Extracting file {zip_file}")
     with zipfile.ZipFile(zip_file, "r") as zipper:
         zipper.extractall(os.path.dirname(zip_file))
+    print(f"Files extracted")
+
+    if not os.path.exists(meshes_path):
+        print(f"Cannot find path {meshes_path}, error with process. Try running the file directly.")
     return
 
 
