@@ -65,6 +65,10 @@ def unzip(zip_file: str):
     print(f"Extracting file {zip_file}")
     with zipfile.ZipFile(zip_file, "r") as zipper:
         zipper.extractall(os.path.dirname(zip_file))
+    print(f"Files extracted")
+
+    if not os.path.exists(meshes_path):
+        print(f"Cannot find path {meshes_path}, error with process. Try running the file directly.")
     return
 
 
