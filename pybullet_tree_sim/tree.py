@@ -3,9 +3,13 @@ from __future__ import annotations
 
 """
 tree.py
-authors: Abhinav Jain, Luke Strohbehn
+authors: Abhinav Jain, Luke Strohbehn, Robin Eshraghi
+modified 12/10/2025 (Robin) functions: label_vertex_by_color / get_all_points / get_apple_centroids
 
 Generates a tree in PyBullet
+
+Modified to include apple path planning features and new tree manipulation utilities.
+
 """
 from collections import defaultdict
 import glob
@@ -111,6 +115,22 @@ class Tree:
         # Labeled OBJ
         labeled_tree_obj = self.load_labeled_tree_obj()
 
+        #logs:
+        unlabeled_wavefront_obj = tree_obj # Renamed for clarity
+        labeled_wavefront_obj = labeled_tree_obj # Renamed for clarity
+        log.info("Inspecting structure of 'unlabeled_wavefront_obj'")
+        if unlabeled_wavefront_obj:
+            log.info(f"  Wavefront Meshes: {len(list(unlabeled_wavefront_obj.meshes.keys()))}")
+            log.info(f"  Wavefront Materials: {len(list(unlabeled_wavefront_obj.materials.keys()))}")
+            if hasattr(unlabeled_wavefront_obj, 'mesh_list') and unlabeled_wavefront_obj.mesh_list:
+                log.info(f"  Wavefront mesh_list items: {[m.name for m in unlabeled_wavefront_obj.mesh_list]}")
+        log.info("Inspecting structure of 'labeled_wavefront_obj'")
+        if labeled_wavefront_obj:
+            log.info(f"  Wavefront Meshes: {len(list(labeled_wavefront_obj.meshes.keys()))}")
+            log.info(f"  Wavefront Materials: {len(list(labeled_wavefront_obj.materials.keys()))}")
+            if hasattr(labeled_wavefront_obj, 'mesh_list') and labeled_wavefront_obj.mesh_list:
+                log.info(f"  Wavefront mesh_list items: {[m.name for m in labeled_wavefront_obj.mesh_list]}")
+
         # Tree specific parameters
         self.rgb_label = RGB_LABEL
         # PyBullet parameters
@@ -134,9 +154,36 @@ class Tree:
         self.projection_sum_x2 = np.array(0.0)
         self.reachable_points = []
 
+        
+        # (robin) Generate the list of exact apple colors to search for 
+        num_apples_to_generate = 50 # Define how many apple colors to search for
+        apple_color_list = []
+        r, g, b = 13, 0, 0
+        for _ in range(num_apples_to_generate):
+            # L-System colors are 0-255, but OBJ/PYWAVEFRONT uses 0-1. so must normalize:
+            apple_color_list.append(np.array([r/255.0, g/255.0, b/255.0]))
+            # Replicate the increment logic from the L-System
+            r += 13
+            if r > 250:
+                r = 13
+                b += 13
+                if b > 250:
+                    b = 13
+                    g += 13
+                    if g > 250: # Safety
+                        g = 0
+        log.info(f"Generated a target list of {len(apple_color_list)} apple colors.")
+        
         # Label textured tree
-        vertex_to_label = self.label_vertex_by_color(self.rgb_label, tree_obj.vertices, labeled_tree_obj.vertices)
-
+        vertex_to_label = self.label_vertex_by_color(
+                                                    self.rgb_label,
+                                                    tree_obj.vertices,
+                                                    labeled_tree_obj.vertices,
+                                                    apple_color_list, 
+                                                    color_dist_threshold=0.1,
+                                                    )
+        
+        
         # append the label to each vertex
         tree_obj_vertices_labeled = []
         for i, vertex in enumerate(tree_obj.vertices):
@@ -313,21 +360,66 @@ class Tree:
             )  # Add collision meshes for each tree here
         return
 
-    def label_vertex_by_color(self, labels, unlabelled_vertices, labelled_vertices):
-        # create a dictionary of vertices and assign label using close enough vertex on labelled tree obj
-        vertex_to_label = {}
-        for i, vertex in enumerate(unlabelled_vertices):
-            vertex_to_label[vertex] = None
+    # (robin) Updated function to prioritize apple color matching
+    def label_vertex_by_color(self, labels, unlabelled_vertices, labelled_vertices,
+                            apple_color_list,
+                            color_dist_threshold=0.05, default_label="UNKNOWN"):
+        """
+        Assigns labels to vertices by directly searching for known colors.
+        1. Checks for standard parts (Trunk, Branch) from the `labels` dict.
+        2. Checks for specific apple colors from the `apple_color_list`.
+        3. Anything else is given the default_label.
+        """
+        final_vertex_labels = {}
+        
+        # Prepare the list of standard colors (Trunk, Branch, etc.)
+        known_colors_list = [(np.array(color), label) for color, label in labels.items()]
 
-        for j, labelled_vertex in enumerate(labelled_vertices):
-            min_dist = 100000
-            for i in labels.keys():
-                # assign label that is closest
-                dist = np.linalg.norm(np.array(labelled_vertex[3:]) - np.array(i))
-                if dist < min_dist:
-                    min_dist = dist
-                    vertex_to_label[labelled_vertex[:3]] = labels[i]
-        return vertex_to_label
+        for vertex_data in labelled_vertices:
+            coords = tuple(vertex_data[:3])
+            color_np = np.array(vertex_data[3:]) # This color is already normalized (0-1)
+            
+            best_label = default_label
+            min_dist = float('inf')
+            
+            # 1) Check for standard parts (Trunk, Branch, etc.) ---
+            matched_standard = False
+            for known_color, label in known_colors_list:
+                dist = np.linalg.norm(color_np - known_color)
+                if dist < color_dist_threshold:
+                    best_label = label
+                    matched_standard = True
+                    break # Found a standard part, no need to check for apples
+            
+            if matched_standard:
+                final_vertex_labels[coords] = best_label
+                continue # Go to the next vertex
+
+            # 2) If not a standard part, check against the specific apple color list ---
+            min_apple_dist = float('inf')
+            best_apple_label = None
+            
+            for i, apple_color in enumerate(apple_color_list):
+                dist = np.linalg.norm(color_np - apple_color)
+                if dist < min_apple_dist:
+                    min_apple_dist = dist
+                    best_apple_label = f"APPLE_{i}"
+
+            # Only if the closest apple color is within the threshold, label it.
+            if min_apple_dist < color_dist_threshold:
+                final_vertex_labels[coords] = best_apple_label
+            else:
+                # If it's not a standard part AND not a target apple color, it's unknown.
+                final_vertex_labels[coords] = default_label
+
+        # Ensure all vertices from the unlabeled mesh get a label
+        for vertex_coord in unlabelled_vertices:
+            coord_tuple = tuple(vertex_coord)
+            if coord_tuple not in final_vertex_labels:
+                final_vertex_labels[coord_tuple] = default_label
+
+        return final_vertex_labels
+    
 
     def get_all_points(self, tree_obj):
         for num, face in enumerate(tree_obj.mesh_list[0].faces):
