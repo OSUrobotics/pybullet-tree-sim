@@ -1,3 +1,13 @@
+"""
+updates 12/8/2025 (Robin Eshraghi) include:
+
+modifications:
+    _assign_control_joints
+    get_current_pose
+    calculate_ik
+
+"""
+
 #!/usr/bin/env python3
 from pybullet_tree_sim.sensors.camera import Camera
 from pybullet_tree_sim.sensors.time_of_flight import TimeOfFlight
@@ -29,6 +39,10 @@ class Robot:
     _robot_configs_path = os.path.join(CONFIG_PATH, "description", "robot")
     _robot_xacro_path = os.path.join(URDF_PATH, "robot", "generic", "robot.urdf.xacro")
     _urdf_tmp_path = os.path.join(URDF_PATH, "tmp")
+
+    print("----CONFIG_PATH",_robot_configs_path)
+    print("----MESHES_PATH",_robot_xacro_path)
+    print("----URDF_PATH",_urdf_tmp_path)
 
     def __init__(
         self,
@@ -191,7 +205,8 @@ class Robot:
         log.warn(joints)
         return joints
 
-    def _assign_control_joints(self, joints: dict) -> tuple[list]:
+    #(edit_robin)
+    def _assign_control_joints(self, joints: dict) -> tuple[list]: 
         """Get list of controllable joints from the joint dict by joint type"""
         control_joints = []
         control_joint_idxs = []
@@ -203,9 +218,28 @@ class Robot:
                 control_joints.append(joint)
                 control_joint_idxs.append(joint_info["id"])
 
+                # (robin) Population Logic 
+                lower_limit = joint_info["lower_limit"]
+                upper_limit = joint_info["upper_limit"]
+                self.control_joint_lower_limits.append(lower_limit)
+                self.control_joint_upper_limits.append(upper_limit)
+                joint_range = upper_limit - lower_limit
+                
+                if joint_range <= 0:    # Handle non-positive range if necessary
+                    if joint_info["type"] == pybullet.JOINT_REVOLUTE: joint_range = 2 * np.pi
+                    else: joint_range = 10 # Adjust default as needed
+                self.control_joint_ranges.append(joint_range)
+                # -----------------------------------
+
                 # self.joint_upper_limits,
                 # self.joint_lower_limits,
                 # self.joint_ranges,  # ,
+            # Check if lists were populated correctly
+            num_ctrl_joints = len(control_joint_idxs)
+            if not (len(self.control_joint_lower_limits) == num_ctrl_joints and \
+                    len(self.control_joint_upper_limits) == num_ctrl_joints and \
+                    len(self.control_joint_ranges) == num_ctrl_joints):
+                        log.error("Mismatch in populating joint limits/ranges!")
 
         return control_joints, control_joint_idxs
 
@@ -407,10 +441,20 @@ class Robot:
         joints = tuple((i[0] for i in j))
         return joints
 
+    # (edit_robin)
     def get_current_pose(self, index):
-        """Returns current pose of the index"""
-        link_state = self.pbclient.getLinkState(self.robot, index, computeForwardKinematics=True)
-        position, orientation = link_state[4], link_state[5]
+        """
+        Returns the current pose of the specified link index.
+        MODIFIED: Handles the base link (-1) using getBasePositionAndOrientation for robustness.
+        """
+        if index == -1:
+            # Use the dedicated function for getting the base position and orientation
+            position, orientation = self.pbclient.getBasePositionAndOrientation(self.robot)
+        else:
+            # Use getLinkState for all other links
+            link_state = self.pbclient.getLinkState(self.robot, index, computeForwardKinematics=True)
+            position, orientation = link_state[4], link_state[5]
+    
         return position, orientation
 
     def get_current_vel(self, index):
@@ -430,18 +474,32 @@ class Robot:
         condition_number = np.linalg.cond(jacobian)
         return condition_number
 
-    def calculate_ik(self, position, orientation):
+    # (edit_robin)
+    def calculate_ik(self, position, orientation): 
         """Calculates joint angles from end effector position and orientation using inverse kinematics"""
+
+        # # --- LOGGING for Monitoring ---
+        # log.debug("--- calculate_ik called with parameters: ---")
+        # log.debug(f"  Target Position: {np.round(position, 4)}")
+        # log.debug(f"  Target Orientation (quat): {np.round(orientation, 4)}")
+        # log.debug(f"  tool0_link_idx: {self.tool0_link_idx}")
+        current_joint_damping = [0.01] * len(self.control_joints) 
+        # log.debug(f"  Joint Damping: {np.round(current_joint_damping, 4)}")
+        # log.debug(f"  Control Joint Lower Limits: {np.round(self.control_joint_lower_limits, 4)}")
+        # log.debug(f"  Control Joint Upper Limits: {np.round(self.control_joint_upper_limits, 4)}")
+        # log.debug(f"  Control Joint Ranges: {np.round(self.control_joint_ranges, 4)}")
+        # log.debug(f"  Rest Poses (if used): {self.init_joint_angles}") # Uncomment if you add restPoses
 
         joint_angles = self.pbclient.calculateInverseKinematics(
             self.robot,
-            self.end_effector_index,
+            self.tool0_link_idx,
             position,
             orientation,
-            jointDamping=[0.01] * len(self.robot_conf["control_joints"]),
-            upperLimits=self.joint_upper_limits,
-            lowerLimits=self.joint_lower_limits,
-            jointRanges=self.joint_ranges,  # , restPoses=self.init_joint_angles
+            jointDamping=current_joint_damping,             # Use the logged variable
+            upperLimits=self.control_joint_upper_limits,
+            lowerLimits=self.control_joint_lower_limits,
+            jointRanges=self.control_joint_ranges,
+            #restPoses=self.init_joint_angles               # ERROR: considering this line resulted in an error!
         )
         return joint_angles
 
