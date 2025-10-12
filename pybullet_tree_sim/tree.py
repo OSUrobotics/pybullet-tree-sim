@@ -225,7 +225,7 @@ class Tree:
         # # Go through vertex_and_projection and assign to bins
         self.populate_bins(self.vertex_and_projection)
 
-        del self.vertex_and_projection
+        #del self.vertex_and_projection
 
         return
 
@@ -360,7 +360,7 @@ class Tree:
             )  # Add collision meshes for each tree here
         return
 
-    # (robin) Updated function to prioritize apple color matching
+    # (edit_robin) Updated function to prioritize apple color matching
     def label_vertex_by_color(self, labels, unlabelled_vertices, labelled_vertices,
                             apple_color_list,
                             color_dist_threshold=0.05, default_label="UNKNOWN"):
@@ -419,82 +419,116 @@ class Tree:
                 final_vertex_labels[coord_tuple] = default_label
 
         return final_vertex_labels
-    
 
+    # (edit_robin) Handling of potential numerical issues like zero-length vectors, NaN propagation, division by zero, and negative arguments to square roots
     def get_all_points(self, tree_obj):
         for num, face in enumerate(tree_obj.mesh_list[0].faces):
+            
             # Order the sides of the face by length
-            ab = (
+            ab_data = ( # Renamed to avoid conflict if you use 'ab' as a vector later
                 face[0],
                 face[1],
                 np.linalg.norm(self.transformed_vertices[face[0]][0] - self.transformed_vertices[face[1]][0]),
             )
-            ac = (
+            ac_data = ( # Renamed
                 face[0],
                 face[2],
                 np.linalg.norm(self.transformed_vertices[face[0]][0] - self.transformed_vertices[face[2]][0]),
             )
-            bc = (
+            bc_data = ( # Renamed
                 face[1],
                 face[2],
                 np.linalg.norm(self.transformed_vertices[face[1]][0] - self.transformed_vertices[face[2]][0]),
             )
 
             normal_vec = np.cross(
-                self.transformed_vertices[ac[0]][0] - self.transformed_vertices[ac[1]][0],
-                self.transformed_vertices[bc[0]][0] - self.transformed_vertices[bc[1]][0],
+                self.transformed_vertices[ac_data[0]][0] - self.transformed_vertices[ac_data[1]][0], # Use ac_data
+                self.transformed_vertices[bc_data[0]][0] - self.transformed_vertices[bc_data[1]][0], # Use bc_data
             )
             # Only front facing faces
             if np.dot(normal_vec, [0, 1, 0]) < 0:
                 continue
-            # argsort sorts in ascending order
-            sides = [ab, ac, bc]
-            sorted_sides = np.argsort([x[2] for x in sides])
-            ac = sides[sorted_sides[2]]
-            ab = sides[sorted_sides[1]]
-            bc = sides[sorted_sides[0]]
-            # |a
-            # |\
-            # | \
-            # |  \
-            # |   \
-            # |    \
-            # b______\c
-            perpendicular_projection = compute_perpendicular_projection_vector(
-                self.transformed_vertices[ac[0]][0] - self.transformed_vertices[ac[1]][0],
-                self.transformed_vertices[bc[0]][0] - self.transformed_vertices[bc[1]][0],
-            )
+            
+            sides = [ab_data, ac_data, bc_data]
+            # argsort sorts in ascending order of side lengths (element at index 2)
+            sorted_indices = np.argsort([s[2] for s in sides])
+            
+            # s_ac, s_ab, s_bc refer to the side data tuples (vertex1_idx, vertex2_idx, length)
+            s_bc = sides[sorted_indices[0]] # Shortest side data
+            s_ab = sides[sorted_indices[1]] # Middle side data
+            s_ac = sides[sorted_indices[2]] # Longest side data
+
+            # Define the vectors for projection
+            # Vector along the longest side (AC)
+            vec_ac_edge = self.transformed_vertices[s_ac[0]][0] - self.transformed_vertices[s_ac[1]][0]
+            # Vector along the shortest side (BC) - this is likely the one causing issues if it's zero length
+            vec_bc_edge = self.transformed_vertices[s_bc[0]][0] - self.transformed_vertices[s_bc[1]][0]
+
+            # CHECK FOR ZERO-LENGTH VECTOR
+            # Check if the length of the shortest side (s_bc[2]) is effectively zero. means vec_bc_edge will be a zero vector.
+            if s_bc[2] < 1e-9:  # Using the pre-calculated length s_bc[2]
+                # print(f"DEBUG: Face {face_indices} has a zero-length shortest edge {s_bc[0]}-{s_bc[1]}. Setting perpendicular_projection to zero.")
+                perpendicular_projection = np.array([0.0, 0.0, 0.0])
+            else:
+                perpendicular_projection = compute_perpendicular_projection_vector(
+                    vec_ac_edge,
+                    vec_bc_edge,
+                )
+
+            # Check if perpendicular_projection itself became NaN for any other unexpected reason
+            if np.isnan(perpendicular_projection).any():
+                # print(f"DEBUG: perpendicular_projection is NaN for face with original vertices {face}. Skipping summation.")
+                perpendicular_projection = np.array([0.0, 0.0, 0.0]) 
+                # continue # Or skip this point entirely
 
             scale = np.random.uniform()
-            tree_point = (1 - scale) * self.transformed_vertices[ab[0]][0] + scale * self.transformed_vertices[ab[1]][0]
+            # Use s_ab (middle side) for defining tree_point as per your original logic
+            tree_point = (1 - scale) * self.transformed_vertices[s_ab[0]][0] + scale * self.transformed_vertices[s_ab[1]][0]
 
-            # Label the face as the majority label of the verticesp
             labels = [
-                self.transformed_vertices[ab[0]][1],
-                self.transformed_vertices[ab[1]][1],
-                self.transformed_vertices[ac[0]][1],
-                self.transformed_vertices[ac[1]][1],
-                self.transformed_vertices[bc[0]][1],
-                self.transformed_vertices[bc[1]][1],
+                self.transformed_vertices[s_ab[0]][1], self.transformed_vertices[s_ab[1]][1],
+                self.transformed_vertices[s_ac[0]][1], self.transformed_vertices[s_ac[1]][1],
+                self.transformed_vertices[s_bc[0]][1], self.transformed_vertices[s_bc[1]][1],
             ]
 
-            # If all three vertices are the same label, assign that label
-            # else assign label "JOINT"
             if len(set(labels)) == 1:
                 label = labels[0]
             else:
                 label = "JOINT"
-            if label != "SPUR" and label != "WATER_BRANCH":
+            if label != "APPLE" and label != "SPUR": #label != "SPUR" and label != "WATER_BRANCH" and label != "APPLE":
                 continue
+            
             self.vertex_and_projection.append((tree_point, perpendicular_projection, normal_vec, label))
-            # This projection mean is used to filter corner/flushed faces which do not correspond to a branch
-            self.projection_sum_x += np.linalg.norm(perpendicular_projection)
-            self.projection_sum_x2 += np.linalg.norm(perpendicular_projection) ** 2
+            
+            current_norm = np.linalg.norm(perpendicular_projection)
+            if np.isnan(current_norm):
+                # print(f"DEBUG: Norm of perpendicular_projection is NaN. Skipping sums for this point.")
+                pass # Do not add NaN to sums
+            else:
+                self.projection_sum_x += current_norm
+                self.projection_sum_x2 += current_norm ** 2
 
-        self.projection_mean = self.projection_sum_x / len(self.vertex_and_projection)
-        self.projection_std = np.sqrt(
-            self.projection_sum_x2 / len(self.vertex_and_projection) - self.projection_mean**2
-        )
+        # Calculation of mean and std
+        N = len(self.vertex_and_projection)
+        if N > 0:
+            self.projection_mean = self.projection_sum_x / N
+            # print(f"DEBUG: N (len(self.vertex_and_projection)) = {N}")
+            # print(f"DEBUG: self.projection_sum_x = {self.projection_sum_x}")
+            # print(f"DEBUG: self.projection_sum_x2 = {self.projection_sum_x2}")
+            # print(f"DEBUG: calculated self.projection_mean = {self.projection_mean}")
+            val_E_X_sq = self.projection_sum_x2 / N
+            val_E_X_whole_sq = self.projection_mean ** 2
+            variance_before_sqrt = val_E_X_sq - val_E_X_whole_sq
+            # print(f"DEBUG: E[X^2] (sum_x2/N) = {val_E_X_sq}")
+            # print(f"DEBUG: (E[X])^2 (mean^2) = {val_E_X_whole_sq}")
+            # print(f"DEBUG: Variance before sqrt (E[X^2] - (E[X])^2) = {variance_before_sqrt}")
+            self.projection_std = np.sqrt(max(0, variance_before_sqrt))
+            # print(f"DEBUG: Calculated self.projection_std = {self.projection_std}")
+        else:
+            # print("DEBUG: N is 0 in get_all_points, no points added. Setting mean/std to 0.")
+            self.projection_mean = np.array(0.)
+            self.projection_std = np.array(0.)
+        
         return
 
     def filter_outliers(self):
