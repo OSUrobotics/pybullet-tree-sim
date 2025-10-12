@@ -567,6 +567,39 @@ class Tree:
         )
         return
 
+   # (add_robin) New function to get apple centroids based on unique labels
+    def get_apple_centroids(self): # No parameters needed
+        """
+        Identifies individual apple centroids based on their unique "APPLE_i" label.
+        This method replaces the need for spatial clustering.
+        """
+        if not hasattr(self, 'transformed_vertices') or not self.transformed_vertices:
+            log.warning("get_apple_centroids: 'transformed_vertices' not available or empty.")
+            return []
+
+        # Group points by their unique apple label
+        apple_points_by_label = defaultdict(list)
+        for coords_np, label_str in self.transformed_vertices:
+            if isinstance(label_str, str) and label_str.startswith("APPLE_"):
+                apple_points_by_label[label_str].append(coords_np)
+
+        if not apple_points_by_label:
+            log.info("get_apple_centroids: No points with 'APPLE_' labels found.")
+            return []
+
+        # Calculate the centroid for each group of points
+        centroids = []
+        log.info(f"get_apple_centroids: Found {len(apple_points_by_label)} unique apple labels. Calculating centroids...")
+        for label, points_list in sorted(apple_points_by_label.items()):
+            points_np = np.array(points_list)
+            center_of_cluster = np.mean(points_np, axis=0)
+            centroids.append(center_of_cluster)
+            log.debug(f"  {label}: Centroid {center_of_cluster.round(3)}, found from {len(points_list)} points.")
+            
+        return centroids
+
+    _VECTOR_EPSILON = 1e-6
+    
     def load_tree_urdf(
         self,
         scale: float,
