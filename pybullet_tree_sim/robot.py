@@ -5,6 +5,13 @@ modifications:
     _assign_control_joints
     get_current_pose
     calculate_ik
+    check_collisions
+
+added:
+    skew_symmetric
+    make_adjoint
+    convert_local_action_to_global
+    find_closest_vertex_label_kdtree
 
 """
 
@@ -503,6 +510,44 @@ class Robot:
         )
         return joint_angles
 
+    # (add_robin)
+    def skew_symmetric(self, vector): 
+        """
+        Compute the skew-symmetric matrix of a vector.
+        """
+        x, y, z = vector
+        return np.array([
+            [0, -z, y],
+            [z, 0, -x],
+            [-y, x, 0]
+        ])
+
+    # (add_robin)
+    def make_adjoint(self, rotation_matrix, translation_vector):
+        """
+        Create the adjoint transformation matrix.
+        """
+        p_skew = self.skew_symmetric(translation_vector)
+        adjoint = np.block([
+            [rotation_matrix, np.zeros((3, 3))],
+            [np.dot(p_skew, rotation_matrix), rotation_matrix]
+        ])
+        return adjoint
+
+    # (add_robin)
+    def convert_local_action_to_global(self, action):
+        """Convert local action to global action using the tool0 link as the reference frame."""
+        # Get the current pose of the reference link (tool0)
+        pos, orient = self.get_current_pose(self.tool0_link_idx)
+        
+        # Create the adjoint transformation matrix from the current pose
+        adjoint = self.make_adjoint(np.array(self.pbclient.getMatrixFromQuaternion(orient)).reshape(3, 3), pos)
+        
+        # Transform the local action vector to a global action vector
+        global_action = np.dot(adjoint, action)
+
+        return global_action
+    
     def calculate_jacobian(self):
         jacobian = self.pbclient.calculateJacobian(
             self.robot,
@@ -515,12 +560,13 @@ class Robot:
         jacobian = np.vstack(jacobian)
         return jacobian
 
+    #check outputs
     def calculate_joint_velocities_from_ee_velocity(self, end_effector_velocity):
         """Calculate joint velocities from end effector velocity using jacobian using least squares"""
         jacobian = self.calculate_jacobian()
         inv_jacobian = np.linalg.pinv(jacobian)
         joint_velocities = np.matmul(inv_jacobian, end_effector_velocity).astype(np.float32)
-        return joint_velocities, jacobian
+        return joint_velocities, jacobian  # (-joint_velocities)
 
     def calculate_joint_velocities_from_ee_velocity_dls(self, end_effector_velocity, damping_factor: float = 0.05):
         """Calculate joint velocities from end effector velocity using damped least squares"""
@@ -530,7 +576,7 @@ class Robot:
         damped_matrix_inv = np.linalg.inv(damped_matrix)
         dls_inv_jacobian = jacobian.T @ damped_matrix_inv
         joint_velocities = dls_inv_jacobian @ end_effector_velocity
-        return joint_velocities, jacobian
+        return joint_velocities, jacobian   # (-joint_velocities)
 
     # TODO: Make camera a separate class?
     def create_camera_transform(self, world_position, world_orientation, camera: Camera | None) -> np.ndarray:
@@ -600,50 +646,155 @@ class Robot:
                     self.pbclient.setCollisionFilterPair(self.robot, self.robot, i, j, 1)
         return
 
-    def check_collisions(self, collision_objects) -> Tuple[bool, dict]:
-        """Check if there are any collisions between the robot and the environment
-        Returns: Dictionary with information about collisions (Acceptable and Unacceptable)
+    # (add_robin) helper for "check_collisions" func.
+    def find_closest_vertex_label_kdtree(self, 
+                                         contact_point_world: np.ndarray, 
+                                         tree_object_with_kdtree: 'Tree', # Expects the Tree object
+                                         distance_upper_bound: float = 0.1) -> str | None: # Optional max distance
         """
+        Finds the label of the closest vertex in the tree's K-D tree
+        to the contact_point_world.
+        Args:
+            contact_point_world: The [x,y,z] of the contact.
+            tree_object_with_kdtree: The Tree object which should have a pre-built .kdtree
+                                     and .kdtree_vertex_labels.
+            distance_upper_bound: Optional. Max distance to consider a vertex "close".
+                                  Helps to avoid spurious matches if contact is far from any tree vertex.
+        Returns:
+            The string label of the closest vertex, or None if not found or too far.
+        """
+        if tree_object_with_kdtree is None or \
+           not hasattr(tree_object_with_kdtree, 'kdtree') or \
+           tree_object_with_kdtree.kdtree is None or \
+           not hasattr(tree_object_with_kdtree, 'kdtree_vertex_labels') or \
+           not tree_object_with_kdtree.kdtree_vertex_labels:
+            
+            log.warning("find_closest_vertex_label_kdtree: Tree object or its K-D tree/labels not available.")
+            return "UNKNOWN_KDTREE_UNAVAILABLE" 
+
+        try:
+            # Query the K-D tree for the nearest neighbor / k=1 : find the 1st nearest neighbor / 
+            distance_sq, index = tree_object_with_kdtree.kdtree.query(
+                contact_point_world, k=1, distance_upper_bound=distance_upper_bound
+            )
+
+            if index < len(tree_object_with_kdtree.kdtree_vertex_labels): # Check if a neighbor was found within distance_upper_bound
+                closest_label = tree_object_with_kdtree.kdtree_vertex_labels[index]
+                # log.debug(f"KDTree Query: Contact {np.round(contact_point_world,3)}, "
+                #           f"Closest Vertex Index: {index}, "
+                #           f"Coord: {np.round(tree_object_with_kdtree.kdtree_vertex_coords_np[index],3)}, "
+                #           f"Dist: {np.sqrt(distance_sq):.4f}, Label: {closest_label}")
+                return closest_label
+            else: # No point found within distance_upper_bound
+                # log.debug(f"KDTree Query: No vertex found within distance_upper_bound ({distance_upper_bound}) "
+                #           f"for contact point {np.round(contact_point_world,3)}")
+                return "UNKNOWN_TOO_FAR" 
+
+        except Exception as e:
+            log.error(f"Error during K-D tree query: {e}", exc_info=True)
+            return "UNKNOWN_KDTREE_QUERY_ERROR"
+    
+    # (edit_robin) Major overhaul to use K-D tree for labeling
+    def check_collisions(self,  # Eddited By Robben
+                         collision_objects: dict, 
+                         tree_object_for_labeling: 'Tree' = None) -> Tuple[bool, dict]:
         collision_info = {
             "collisions_acceptable": False,
             "collisions_unacceptable": False,
+            "contact_point_on_obstacle": None,
+            "collided_obstacle_label": None, #will be determined by closest vertex
+            "self_collision_contact_pos": None,
+            "is_self_collision_unacceptable": False
         }
 
-        collision_acceptable_list = ["SPUR", "WATER_BRANCH"]
-        collision_unacceptable_list = ["TRUNK", "BRANCH", "SUPPORT"]
-        for type in collision_acceptable_list:
-            collisions_acceptable = self.pbclient.getContactPoints(bodyA=self.robot, bodyB=collision_objects[type])
-            if collisions_acceptable:
-                for i in range(len(collisions_acceptable)):
-                    if collisions_acceptable[i][-6] < 0:
-                        collision_info["collisions_acceptable"] = True
-                        break
-            if collision_info["collisions_acceptable"]:
-                break
+        # `collision_objects` here is still expected to map your high-level labels 
+        # (like "TRUNK", "BRANCH" from CONFIG) to the PyBullet ID of the *whole tree*.
+        # Example: {'TRUNK': whole_tree_id, 'BRANCH': whole_tree_id}
 
-        for type in collision_unacceptable_list:
-            collisions_unacceptable = self.pbclient.getContactPoints(bodyA=self.robot, bodyB=collision_objects[type])
-            for i in range(len(collisions_unacceptable)):
-                if collisions_unacceptable[i][-6] < 0:
-                    collision_info["collisions_unacceptable"] = True
-                    # break
-            if collision_info["collisions_unacceptable"]:
-                break
+        collision_acceptable_list = [] 
+        collision_unacceptable_env_list = ["BRANCH", "TRUNK", "APPLE", "LEAF", "SPUR"]  # Add more as needed
+        collision_unacceptable_env_list += [f"APPLE_{i}" for i in range(41)]
 
-        if not collision_info["collisions_unacceptable"]:
-            collisons_self = self.pbclient.getContactPoints(bodyA=self.robot, bodyB=self.robot)
-            collisions_unacceptable = collisons_self
-            for i in range(len(collisions_unacceptable)):
-                if collisions_unacceptable[i][-6] < -0.00:
-                    collision_info["collisions_unacceptable"] = True
+        
+        # 1. Check for "Acceptable" Environmental Collisions
+        for acc_type in collision_acceptable_list:
+            # We assume 'APPLE' might also map to the whole tree_id if you don't have separate apple bodies
+            # Or, if you *do* have separate apple bodies, collision_objects[acc_type] would be the apple's pb_id.
+            if acc_type in collision_objects and collision_objects[acc_type] is not None:
+                contacts = self.pbclient.getContactPoints(bodyA=self.robot, bodyB=collision_objects[acc_type])
+                if contacts:
+                    for contact_point_detail in contacts:
+                        if contact_point_detail[8] < -0.001: 
+                            collision_info["collisions_acceptable"] = True
+                            # If it's an APPLE collision, we can directly use the acc_type as the label
+                            collision_info["contact_point_on_obstacle"] = contact_point_detail[6] 
+                            collision_info["collided_obstacle_label"] = acc_type 
+                            log.warning(f"---- ACCEPTABLE collision with {acc_type} ----")
+                            break
+                if collision_info["collisions_acceptable"]:
                     break
-        if self.verbose > 1:
-            print(f"DEBUG: {collision_info}")
+        
+        # 2. Check for "Unacceptable" Environmental Collisions (TRUNK, BRANCH) ---
+        # This section now primarily serves to trigger the check against the whole tree.
+        # The actual label ("TRUNK" or "BRANCH") will be determined by querying vertex data.
+        if not collision_info["collisions_unacceptable"] and not collision_info["collisions_acceptable"]:
+            # We only need to check against the tree once if TRUNK and BRANCH map to the same tree_id
+            # Get the tree_id from one of the unacceptable labels if available
+            tree_pb_id_to_check = None
+            for label in collision_unacceptable_env_list:
+                if label in collision_objects and collision_objects[label] is not None:
+                    tree_pb_id_to_check = collision_objects[label]
+                    break
+            
+            if tree_pb_id_to_check is not None:
+                contacts_with_tree = self.pbclient.getContactPoints(bodyA=self.robot, bodyB=tree_pb_id_to_check)
+                if contacts_with_tree:
+                    for contact_point_detail in contacts_with_tree:
+                        if contact_point_detail[8] < -0.0001: # Penetration: 1cm
+                            contact_pos_on_tree = contact_point_detail[6] # Position on BodyB (tree)
+                            collision_info["contact_point_on_obstacle"] = contact_pos_on_tree
+                            
+                            determined_label = "UNKNOWN_NO_CLOSE_VERTEX" # Default if labeling fails
+                            if tree_object_for_labeling and hasattr(tree_object_for_labeling, 'transformed_vertices'):
+                                determined_label = self.find_closest_vertex_label_kdtree(
+                                    np.array(contact_pos_on_tree), 
+                                    tree_object_for_labeling    #.transformed_vertices
+                                )
+                                if determined_label is None: determined_label = "UNKNOWN_NO_CLOSE_VERTEX"
+                            
+                            collision_info["collided_obstacle_label"] = determined_label
+                            
+                            # Now decide if this determined_label is unacceptable
+                            if determined_label in collision_unacceptable_env_list:
+                                collision_info["collisions_unacceptable"] = True
+                                log.error(f"---- UNACCEPTABLE collision with determined label '{determined_label}' at {np.round(contact_pos_on_tree, 3)} ----")
+                            elif determined_label in collision_acceptable_list: 
+                                collision_info["collisions_acceptable"] = True
+                                log.warning(f"---- ACCEPTABLE collision with determined label '{determined_label}' at {np.round(contact_pos_on_tree, 3)} ----")
+                            else:  # Collision with a part of the tree not explicitly acceptable or unacceptable 
+                                # TODO: Decide how to treat these. For now, assume: unacceptable for planning.
+                                collision_info["collisions_acceptable"] = True
+                                log.warning(f"---- Collision with tree part labeled '{determined_label}' (treated as ACCEPTABLE) at {np.round(contact_pos_on_tree, 3)} ----")
+                            break 
 
-        if collision_info["collisions_acceptable"] or collision_info["collisions_unacceptable"]:
-            return True, collision_info
 
-        return False, collision_info
+        # 3. Check for Self-Collisions
+        if not collision_info["collisions_unacceptable"]: 
+            self_contact_points = self.pbclient.getContactPoints(bodyA=self.robot, bodyB=self.robot)
+            for contact_point_detail in self_contact_points:
+                link_a_index = contact_point_detail[3]
+                link_b_index = contact_point_detail[4]
+                contact_distance = contact_point_detail[8]
+                if link_a_index == link_b_index: continue
+                if contact_distance < -0.015:   #-0.015: 
+                    collision_info["collisions_unacceptable"] = True
+                    collision_info["is_self_collision_unacceptable"] = True
+                    collision_info["self_collision_contact_pos"] = contact_point_detail[5]
+                    log.error(f"---- UNACCEPTABLE SELF_COLLISION ---- ...")
+                    break
+        
+        #log.debug(f"Collision Check Result (after vertex query): {collision_info}")
+        return collision_info["collisions_unacceptable"], collision_info
 
     def check_success_collision(self, body_b) -> bool:
         """Check if there are any collisions between the robot and the environment
