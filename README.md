@@ -1,7 +1,9 @@
-## Apple picking path planner and trajectory generator for PyBullet sim env (feature)
+# Apple picking path planner and trajectory generator for PyBullet sim env (feature)
+
+[![Watch the video](https://img.youtube.com/vi/L9cdALAOvzs&list=PPSV/maxresdefault.jpg)](https://www.youtube.com/watch?v=L9cdALAOvzs&list=PPSV)
 
 
-# Script Description: 
+## Script Description: 
 
 ### 1: ```feature_apple_path_planning/run_apple_data_generator.py``` 
 This is the main executable script for the data generation pipeline. It uses command-line arguments to run different stages of the process, including:
@@ -12,18 +14,18 @@ This is the main executable script for the data generation pipeline. It uses com
 
 - Visualization: Loads and replays the saved RRT paths in the PyBullet GUI for visual inspection.
 
-### 2: ```feature_apple_path_planning/apple_picking_env.py```: 
+#### 2: ```feature_apple_path_planning/apple_picking_env.py```: 
 This script defines the core simulation environment, ApplePickingEnv, using the gymnasium (formerly Gym) API. It manages the PyBullet physics, loads the robot and tree models, provides sensor data (like camera images and joint states), and calculates rewards. It's the "world" in which the robot operates and is essential for both data generation and (later) RL agent training.
 
 
-### 3: ```feature_apple_path_planning/utils_conversions.py```: 
+#### 3: ```feature_apple_path_planning/utils_conversions.py```: 
 
 This is a utility script containing mathematical helper functions for coordinate frame transformations. Its primary functions, convert_local_action_to_global and convert_global_action_to_local, are used to translate velocity commands between the robot's local end-effector frame (e.g., "move 0.1 m/s along the gripper's 'forward' direction") and the simulation's global world frame.
 
-### 4: ```pybullet_tree_sim/tree.py```: 
+#### 4: ```pybullet_tree_sim/tree.py```: 
 This script defines the ```Tree``` class used in the simulation. It is responsible for loading the tree's URDF (for physics) and its high-resolution ```.obj``` mesh (for geometry). Its most important function is to process a labeled mesh file where vertex colors are used to identify tree parts. It contains the logic to parse these colors and generate a list of 3D coordinates for each individual apple's "centroid" (```get_apple_centroids```), which are then used as goals for the path planner.
 
-### 5: ```pybullet_tree_sim/robot.py```: 
+#### 5: ```pybullet_tree_sim/robot.py```: 
 This script defines the core ```Robot``` class. It is responsible for loading the robot arm model (from ```.xacro``` and config files) into the simulation. It provides the essential API for robot control, such as setting joint velocities (```set_joint_velocities```), calculating inverse kinematics (```calculate_ik```), and getting sensor data (like camera images from ``get_rgbd_at_cur_pose``). It also contains critical modified functions for the project, including a sophisticated ```check_collisions``` method that uses a K-D tree to identify the label of a collided point (e.g., "TRUNK" vs. "APPLE").
 
 ## How to Use ```run_apple_data_generator.py```:
