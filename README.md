@@ -1,6 +1,6 @@
 # Apple picking path planner and trajectory generator for PyBullet sim env (feature)
 
-### Demo (YouTube):
+### Demo (YouTube) [7/10/2025]:
 [![Watch the video](https://img.youtube.com/vi/L9cdALAOvzs/maxresdefault.jpg)](https://www.youtube.com/watch?v=L9cdALAOvzs)
 
 
