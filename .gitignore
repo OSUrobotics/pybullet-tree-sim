@@ -171,3 +171,10 @@ cython_debug/
 pkl/
 
 meshes*/
+**/test.urdf
+
+*.stl
+*.mtl
+*.obj
+open3d_id.py
+pywavefront_id.py

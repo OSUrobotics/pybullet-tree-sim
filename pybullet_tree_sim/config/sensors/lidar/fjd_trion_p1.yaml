@@ -1,0 +1,11 @@
+# https://www.fjdynamics.com/product/fjd-trion-p1-lidar-scanner-specs
+name: "FJD_Trion_P1"
+data_type: "lidar"
+lidar:
+  wavelength: 905 # nm
+  theta: 360
+  phi: 59
+  near_plane: 0.02
+  far_plane: 40
+  width: 5760
+  height: 2880

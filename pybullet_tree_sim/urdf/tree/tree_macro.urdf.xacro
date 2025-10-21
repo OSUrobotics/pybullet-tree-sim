@@ -1,0 +1,41 @@
+<?xml version="1.0"?>
+<robot name="tree" xmlns:xacro="http://ros.org/wiki/xacro">
+
+    <xacro:macro name="tree_macro" params=
+        "
+        tree_name
+        parent:=^|world
+        "
+    >
+        <xacro:property name="mass" value="8.0" />
+        <xacro:property name="scale" value="1 1 1"/>
+
+        <link name="${tree_name}">
+            <visual>
+                <geometry>
+                    <mesh filename="./meshes/trees/obj/${tree_name}.obj" scale="${scale}"/>
+                </geometry>
+                <material name="LightGrey">
+                    <color rgba="0.7 0.7 0.7 1.0"/>
+                </material>
+            </visual>
+            <collision concave="true">
+                <geometry>
+                    <mesh filename="./meshes/trees/obj/${tree_name}.obj" scale="${scale}"/>
+                </geometry>
+            </collision>
+            <inertial>
+                <mass value="${mass}"/>
+                <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+                <inertia ixx="0.00443333156" ixy="0.0" ixz="0.0" iyy="0.00443333156" iyz="0.0" izz="0.0072"/>
+            </inertial>
+        </link>
+        <link name="world"/>
+        <joint name="${tree_name}--${parent}_joint" type="fixed">
+            <parent link="${parent}"/>
+            <child link="${tree_name}"/>
+            <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+        </joint>
+
+    </xacro:macro>
+</robot>

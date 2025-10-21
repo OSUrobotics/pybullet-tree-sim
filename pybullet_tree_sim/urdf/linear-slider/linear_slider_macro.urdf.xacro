@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<robot xmlns:xacro="http://wiki.ros.org/xacro" name="linear_slider">
+    <xacro:macro name="linear_slider_macro" params=
+        "
+        parent
+        linear_slider_tf_prefix
+        mesh_base_path
+        urdf_base_path
+        "
+    >
+
+        <xacro:if value="${ str(linear_slider_tf_prefix) != ''}" >
+            <xacro:property name="tf_prefix" value="${linear_slider_tf_prefix}__"/>
+        </xacro:if>
+        <xacro:unless value="${ str(linear_slider_tf_prefix) != ''}" >
+            <xacro:property name="tf_prefix" value="''" />
+        </xacro:unless>
+
+        <!-- Robot description -->
+        <xacro:include filename="${urdf_base_path}/linear-slider/linear_slider_base.urdf.xacro"/>
+
+        <!-- Macro information -->
+        <xacro:linear_slider_base
+            tf_prefix="${tf_prefix}"
+            parent="${parent}"
+            mesh_base_path="${mesh_base_path}">
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+        </xacro:linear_slider_base>
+        
+    </xacro:macro>
+</robot>

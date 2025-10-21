@@ -51,19 +51,26 @@ def debug_sensor_world_data(data):
     return
 
 
-def debug_deproject_pixels_to_points(sensor, data, cam_coords, world_coords, view_matrix):
+def debug_deproject_pixels_to_points(
+    sensor, data, cam_coords, world_coords, view_matrix
+):
 
     hovertemplate = "id: %{id}<br>x: %{x}<br>y: %{y}<br>z: %{z}<extra></extra>"
 
     fig = go.Figure(
         data=[
             go.Scatter3d(
-                x=np.array(list(range(8)) * 8).reshape((8, 8), order="C").flatten(order="F"),
+                x=np.array(list(range(8)) * 8)
+                .reshape((8, 8), order="C")
+                .flatten(order="F"),
                 y=np.array(list(range(8)) * 8),
                 # y=np.array([list(range(8))] * 8).T.flatten(order="F"),
                 z=data.flatten(),
                 mode="markers",
-                ids=[f"{i}" for i in range(sensor.depth_width * sensor.depth_height)],
+                ids=[
+                    f"{i}"
+                    for i in range(sensor.depth_width * sensor.depth_height)
+                ],
                 hovertemplate=hovertemplate,
             )
         ]
@@ -87,7 +94,10 @@ def debug_deproject_pixels_to_points(sensor, data, cam_coords, world_coords, vie
                 y=sensor.depth_film_coords[:, 1],
                 z=data.flatten(order="F"),
                 mode="markers",
-                ids=[f"{i}" for i in range(sensor.depth_width * sensor.depth_height)],
+                ids=[
+                    f"{i}"
+                    for i in range(sensor.depth_width * sensor.depth_height)
+                ],
                 hovertemplate=hovertemplate,
             )
         ]
@@ -111,7 +121,10 @@ def debug_deproject_pixels_to_points(sensor, data, cam_coords, world_coords, vie
                 y=cam_coords[:, 1],
                 z=cam_coords[:, 2],
                 mode="markers",
-                ids=[f"{i}" for i in range(sensor.depth_width * sensor.depth_height)],
+                ids=[
+                    f"{i}"
+                    for i in range(sensor.depth_width * sensor.depth_height)
+                ],
                 hovertemplate=hovertemplate,
             )
         ]
@@ -137,7 +150,12 @@ def debug_deproject_pixels_to_points(sensor, data, cam_coords, world_coords, vie
                 name="tof_data",
                 mode="markers",
                 marker=dict(size=2),
-                ids=np.array([f"{i}" for i in range(sensor.depth_width * sensor.depth_height)]),
+                ids=np.array(
+                    [
+                        f"{i}"
+                        for i in range(sensor.depth_width * sensor.depth_height)
+                    ]
+                ),
                 hovertemplate=hovertemplate,
             )
         ]

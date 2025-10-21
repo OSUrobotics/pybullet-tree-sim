@@ -1,0 +1,113 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="https://ros.org/wiki/xacro" name="mock_pruner">
+  <!-- Mock Pruner -->
+  <!-- <xacro:arg name="name" default="mock_pruner"/> -->
+  <!-- <xacro:arg name="mesh_base_path" default="./"/> -->
+  <!-- <xacro:property name="end_effector_parent" value="" /> -->
+  <xacro:property name="mock_pruner_rot_offset" value="0.0 0.0 0.0" />
+
+  <!-- ==================== -->
+  <!--      Mock Pruner     -->
+  <!-- ==================== -->
+  <xacro:macro 
+    name="mock_pruner_base"
+    params=
+      "
+      mock_pruner_tf_prefix
+      parent_link
+      tof0_offset
+      tof1_offset
+      camera_offset
+      mesh_base_path
+      "
+  >
+    <xacro:if value="${mock_pruner_tf_prefix != ''}" >
+      <xacro:property name="tf_prefix" value="${mock_pruner_tf_prefix}__"/>
+    </xacro:if>
+    <xacro:unless value="${mock_pruner_tf_prefix != ''}" >
+      <xacro:property name="tf_prefix" value="''" />
+    </xacro:unless>
+    <!-- static properties -->
+    <xacro:property name="mock_pruner_mass" value="0.256" />
+    <xacro:property name="base__tool0_offset" value="0.0 0.0050825 0.1601525" />
+    <!-- <xacro:property name="base__tool0_offset" value="0.0 0.0 0.20"/> -->
+    <xacro:property name="base__tof0_offset" value="${tof0_offset}" />
+    <xacro:property name="base__tof1_offset" value="${tof1_offset}" />
+
+    <!-- <xacro:property name="base__tof0_offset" value="${tof0_offset} 0 0.15"/> -->
+    <!-- <xacro:property name="base__tof1_offset" value="${tof1_offset} 0 0.15"/> -->
+    <xacro:property name="base__camera0_offset" value="-0.0017977 -0.0715747 0.0711646" />
+
+    <!-- ================== -->
+    <!--       Links        -->
+    <!-- ================== -->
+    <link name="${tf_prefix}base">
+      <visual>
+        <material name="orange">
+          <color rgba="${255/255} ${108/255} ${10/255} 1.0" />
+        </material>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <geometry>
+          <mesh filename="${mesh_base_path}/mock-pruner/MockPruner.STL" />
+        </geometry>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <geometry>
+          <mesh filename="${mesh_base_path}/mock-pruner/MockPruner.STL" />
+        </geometry>
+      </collision>
+      <inertial>
+        <mass value="${mock_pruner_mass}" />
+        <origin xyz="0.0 0.0 0.0" />
+        <inertia ixx="0.1" ixy="0.0" ixz="0.0" iyy="0.1" iyz="0.0" izz="0.1" />
+      </inertial>
+    </link>
+
+    <!-- camera link -->
+    <link name="${tf_prefix}camera0" />
+
+    <!-- tof links -->
+    <link name="${tf_prefix}tof0" />
+    <link name="${tf_prefix}tof1" />
+
+    <!-- tool/cut_point link -->
+    <link name="${tf_prefix}tool0" />
+
+    <!-- ================== -->
+    <!--     Joints        -->
+    <!-- ================== -->
+    <joint name="${parent_link}--${tf_prefix}base" type="fixed">
+      <origin xyz="0 0 0" rpy="${mock_pruner_rot_offset}" />
+      <parent link="${parent_link}" />
+      <child link="${tf_prefix}base" />
+    </joint>
+
+    <joint name="${tf_prefix}base--camera0" type="fixed">
+      <origin xyz="${base__camera0_offset}" rpy="0 0 0" />
+      <parent link="${tf_prefix}base" />
+      <child link="${tf_prefix}camera0" />
+    </joint>
+
+    <joint name="${tf_prefix}base--tof0" type="fixed">
+      <!-- <xacro:insert_block name="origin"/> -->
+      <origin xyz="${base__tof0_offset}" rpy="0 0 0" />
+      <parent link="${tf_prefix}base" />
+      <child link="${tf_prefix}tof0" />
+    </joint>
+    <joint name="${tf_prefix}base--tof1" type="fixed">
+      <origin xyz="${base__tof1_offset}" rpy="0 0 0" />
+      <parent link="${tf_prefix}base" />
+      <child link="${tf_prefix}tof1" /> 
+    </joint>
+
+    <joint name="${tf_prefix}base--tool0" type="fixed">
+      <origin xyz="${base__tool0_offset}" rpy="0 0 0" />
+      <parent link="${tf_prefix}base" />
+      <child link="${tf_prefix}tool0" />
+    </joint>
+
+
+  </xacro:macro>
+
+</robot>

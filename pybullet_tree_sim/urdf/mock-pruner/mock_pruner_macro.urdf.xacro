@@ -1,0 +1,77 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="https://ros.org/wiki/xacro" name="mock_pruner">
+  <!-- Mock Pruner -->
+  <!-- <xacro:arg name="name" default="mock_pruner"/> -->
+  <!-- <xacro:arg name="mesh_base_path" default="./"/> -->
+  <!-- <xacro:property name="end_effector_parent" value="" /> -->
+  <xacro:property name="mock_pruner_rot_offset" value="0.0 0.0 0.0" />
+
+  <!-- Materials -->
+
+
+  <xacro:macro name="mock_pruner_macro" params="mesh_base_path mock_pruner_tf_prefix parent_link tof0_offset tof1_offset camera_offset urdf_base_path">
+    <!-- additional args -->
+    <xacro:arg name="mesh_base_path" default="" />
+    <xacro:arg name="rotation_correction_plate_prefix" default="rotation_correction_plate" />
+    <xacro:arg name="dovetail_male_mount_prefix" default="dovetail_male_mount" />
+    <xacro:arg name="dovetail_female_mount_prefix" default="dovetail_female_mount" />
+    <xacro:property name="rotation_correction_plate_prefix" value="$(arg rotation_correction_plate_prefix)" />
+    <xacro:property name="dovetail_male_mount_prefix" value="$(arg dovetail_male_mount_prefix)" />
+    <xacro:property name="dovetail_female_mount_prefix" value="$(arg dovetail_female_mount_prefix)" />
+
+    <xacro:if value="${rotation_correction_plate_prefix != ''}" >
+      <xacro:property name="rcp_tf_prefix" value="${rotation_correction_plate_prefix}__"/>
+    </xacro:if>
+    <xacro:unless value="${rotation_correction_plate_prefix != ''}" >
+      <xacro:property name="rcp_tf_prefix" value="" />
+    </xacro:unless>
+
+    <xacro:if value="${dovetail_male_mount_prefix != ''}" >
+      <xacro:property name="dtm_tf_prefix" value="${dovetail_male_mount_prefix}__"/>
+    </xacro:if>
+    <xacro:unless value="${dovetail_male_mount_prefix != ''}" >
+      <xacro:property name="dtm_tf_prefix" value="" />
+    </xacro:unless>
+
+    <xacro:if value="${dovetail_female_mount_prefix != ''}" >
+      <xacro:property name="dtf_tf_prefix" value="${dovetail_female_mount_prefix}__"/>
+    </xacro:if>
+    <xacro:unless value="${dovetail_female_mount_prefix != ''}" >
+      <xacro:property name="dtf_tf_prefix" value="" />
+    </xacro:unless>
+
+    <!-- rotation correction plate macro -->
+    <xacro:include
+      filename="${urdf_base_path}/rotation-correction-plate/rotation_correction_plate_macro.urdf.xacro"
+    />
+    <xacro:rotation_correction_plate_macro
+      parent_link="${parent_link}"
+      rotation_correction_plate_prefix="$(arg rotation_correction_plate_prefix)"
+      mesh_base_path="${mesh_base_path}"
+    />
+
+    <!-- dovetail_mount macro -->
+    <xacro:include filename="${urdf_base_path}/dovetail-mount/dovetail_mount_macro.urdf.xacro" />
+    <xacro:dovetail_mount_macro
+      parent_link="${rcp_tf_prefix}tool0"
+      dovetail_male_mount_prefix="$(arg dovetail_male_mount_prefix)"
+      dovetail_female_mount_prefix="$(arg dovetail_female_mount_prefix)"
+      mesh_base_path="${mesh_base_path}"
+      urdf_base_path="${urdf_base_path}"
+    />
+
+    <!-- Mock pruner macro -->
+    <xacro:include filename="${urdf_base_path}/mock-pruner/mock_pruner_base.urdf.xacro" />
+    <xacro:mock_pruner_base
+      parent_link="${dtf_tf_prefix}tool0"
+      mock_pruner_tf_prefix="${mock_pruner_tf_prefix}"
+      tof0_offset="${tof0_offset}"
+      tof1_offset="${tof1_offset}"
+      camera_offset="${camera_offset}"
+      mesh_base_path="${mesh_base_path}"
+    />
+
+    
+
+  </xacro:macro>
+</robot>

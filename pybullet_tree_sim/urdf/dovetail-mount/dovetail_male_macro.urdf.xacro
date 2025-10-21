@@ -1,0 +1,62 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="https://ros.org/wiki/xacro" name="dovetail_mount">
+
+  <xacro:macro name="dovetail_male_mount_macro" params="parent_link dovetail_male_mount_prefix mesh_base_path">
+    <xacro:if value="${ str(dovetail_male_mount_prefix) != ''}" >
+      <xacro:property name="tf_prefix" value="${dovetail_male_mount_prefix}__"/>
+    </xacro:if>
+    <xacro:unless value="${ str(dovetail_male_mount_prefix) != ''}" >
+      <xacro:property name="tf_prefix" value="''" />
+    </xacro:unless>
+    <!-- ==================== -->
+    <!-- Dovetail Male Mount  -->
+    <!-- ==================== -->
+    <material name="lavender">
+      <color rgba="0.749 0.580 0.894 1"/>
+    </material>
+    <xacro:property name="dovetail_male_mass" value="0.033"/>
+    <xacro:property name="dovetail_male_tool0_height" value="0.02293"/>
+    <xacro:property name="dovetail_male_rot_offset" value="0.0 0.0 0.0"/>
+    
+    <!-- links -->
+    <link name="${tf_prefix}base"/>
+    <link name='${tf_prefix}body'>
+      <visual>
+        <material name="lavender"/>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="${mesh_base_path}/dovetail-mount/DovetailMale.STL"/>
+        </geometry>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="${mesh_base_path}/dovetail-mount/DovetailMale.STL"/>
+        </geometry>
+      </collision>
+      <inertial>
+        <mass value="${dovetail_male_mass}"/>
+        <origin xyz="0.0 0.0 0.0"/>
+        <inertia ixx="0.0001" ixy="0.0" ixz="0.0" iyy="0.0001" iyz="0.0" izz="0.0001"/>
+      </inertial>
+    </link>
+    <link name="${tf_prefix}tool0"/>
+    <!-- joints -->
+    <joint name="${parent_link}--${tf_prefix}base" type="fixed">
+      <origin xyz="0 0 0" rpy="${dovetail_male_rot_offset}"/>
+      <parent link="${parent_link}"/>
+      <child link="${tf_prefix}base"/>
+    </joint>
+    <joint name="${tf_prefix}base--body" type="fixed">
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <parent link="${tf_prefix}base"/>
+      <child link="${tf_prefix}body"/>
+    </joint>
+    <joint name="${tf_prefix}body--tool0" type="fixed">
+      <origin xyz="0 0 ${dovetail_male_tool0_height}" rpy="0 0 0"/>
+      <parent link="${tf_prefix}body"/>
+      <child link="${tf_prefix}tool0"/>
+    </joint>
+  </xacro:macro>
+
+</robot>

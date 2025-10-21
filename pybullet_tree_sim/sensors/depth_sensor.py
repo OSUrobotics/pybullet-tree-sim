@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-from pybullet_tree_sim.sensors.sensor import Sensor
+from pybullet_tree_sim.sensors.optical_sensor import OpticalSensor
 import pybullet_tree_sim.utils.camera_helpers as ch
 import numpy as np
 
+from typing import Union
 
-class DepthSensor(Sensor):
+
+class DepthSensor(OpticalSensor):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         pbclient = kwargs.get("pbclient")
@@ -25,11 +27,17 @@ class DepthSensor(Sensor):
         self.far_val = self.params["depth"]["far_plane"]
 
         # Pixel coordinates, indexed by depth_width, depth_height, nx1 array COLUMN MAJOR
-        self.depth_pixel_coords = np.array(list(np.ndindex((self.depth_width, self.depth_height))), dtype=int)
+        self.depth_pixel_coords = np.array(
+            list(np.ndindex((self.depth_width, self.depth_height))), dtype=int
+        )
         # Film coordinates projected to [-1, 1], nx1 array COLUMN MAJOR
         self.depth_film_coords = (
             2
-            * (self.depth_pixel_coords + np.array([0.5, 0.5]) - np.array([self.depth_width / 2, self.depth_height / 2]))
+            * (
+                self.depth_pixel_coords
+                + np.array([0.5, 0.5])
+                - np.array([self.depth_width / 2, self.depth_height / 2])
+            )
             / np.array([self.depth_width, self.depth_height])
         )
         # Depth projection matrix from camera intrinsics
@@ -41,17 +49,49 @@ class DepthSensor(Sensor):
         )
         return
 
+    def get_camera_intrinsics(self) -> dict:  # TODO: change to *args ?
+        """Convert depth sensor parameters to standard camera intrinsics.
+        :return: Dict with camera intrinsics. Keys -- fx, fy, cx, cy, width, height, znear, zfar
+        :rtype: dict
+        """
+        # Calculate focal lengths from FOV
+        fx = self.depth_width / (2 * np.tan(np.radians(self.depth_hfov) / 2))
+        fy = self.depth_height / (2 * np.tan(np.radians(self.depth_vfov) / 2))
+
+        # Principal point at image center
+        cx = self.depth_width / 2
+        cy = self.depth_height / 2
+
+        return dict(
+            depth=dict(
+                fx=fx,
+                fy=fy,
+                cx=cx,
+                cy=cy,
+                width=self.depth_width,
+                height=self.depth_height,
+                znear=self.near_val,
+                zfar=self.far_val,
+            )
+        )
+
 
 def main():
     from pybullet_tree_sim.utils.pyb_utils import PyBUtils
     import pprint as pp
 
     pbutils = PyBUtils(renders=False)
-    sensor = DepthSensor(pbclient=pbutils.pbclient, sensor_name="vl53l8cx", sensor_type="tof")
+    sensor = DepthSensor(
+        pbclient=pbutils.pbclient, sensor_name="vl53l8cx", sensor_type="tof"
+    )
+    print("Params:\n", sensor.params)
     pp.pprint(sensor.params)
-    # pp.pprint(sensor.depth_pixel_coords)
-    # pp.pprint(sensor.depth_film_coords)
-    # pp.pprint(sensor.depth_proj_mat)
+    print("Pixel coords:\n")
+    pp.pprint(sensor.depth_pixel_coords)
+    print("Film coords:\n")
+    pp.pprint(sensor.depth_film_coords)
+    print("Proj matrix:\n")
+    pp.pprint(sensor.depth_proj_mat)
     return
 
 

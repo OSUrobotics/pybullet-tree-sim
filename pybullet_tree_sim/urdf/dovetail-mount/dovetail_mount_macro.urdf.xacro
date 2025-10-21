@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="https://ros.org/wiki/xacro" name="dovetail_mount">
+    <!-- =================== -->
+    <!--   Dovetail Mount    -->
+    <!-- =================== -->
+    <xacro:macro
+        name="dovetail_mount_macro"
+        params="parent_link dovetail_male_mount_prefix dovetail_female_mount_prefix mesh_base_path urdf_base_path"
+    >
+        <xacro:include filename="${urdf_base_path}/dovetail-mount/dovetail_male_macro.urdf.xacro"/>
+        <xacro:include filename="${urdf_base_path}/dovetail-mount/dovetail_female_macro.urdf.xacro"/>
+        <xacro:dovetail_male_mount_macro 
+            parent_link="${parent_link}" 
+            dovetail_male_mount_prefix="${dovetail_male_mount_prefix}"
+            mesh_base_path="${mesh_base_path}"
+        />
+        <xacro:dovetail_female_mount_macro
+            parent_link="${dovetail_male_mount_prefix}__tool0"
+            dovetail_female_mount_prefix="${dovetail_female_mount_prefix}"
+            mesh_base_path="${mesh_base_path}"
+        />
+    </xacro:macro>
+    
+</robot>

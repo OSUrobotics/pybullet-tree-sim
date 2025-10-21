@@ -43,5 +43,5 @@ dependencies = [
     "zenlog",
 ]
 
-[project.scripts]
-mesh_downloader = 'pybullet_tree_sim.utils.mesh_downloader:main'
+# [project.scripts]
+# mesh_downloader = 'pybullet_tree_sim.utils.mesh_downloader:main'

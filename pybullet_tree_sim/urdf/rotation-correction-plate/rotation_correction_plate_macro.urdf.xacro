@@ -1,0 +1,64 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="https://ros.org/wiki/xacro" name="dovetail_mount">
+    <xacro:property name="rotation_correction_plate_tool0_height" value="0.01268"/>
+    <xacro:property name="rotation_correction_plate_rot_offset" value="0.0 0.0 0.0"/>
+
+    <xacro:property name="rotation_correction_plate_mass" value="0.047"/>
+    <xacro:property name="rotation_correction_plate_rot_offset" value="0.0 0.0 0.0" />
+
+    <xacro:macro name="rotation_correction_plate_macro" params="parent_link rotation_correction_plate_prefix mesh_base_path">
+        <xacro:if value="${ str(rotation_correction_plate_prefix) != ''}" >
+            <xacro:property name="tf_prefix" value="${rotation_correction_plate_prefix}__"/>
+        </xacro:if>
+        <xacro:unless value="${ str(rotation_correction_plate_prefix) != ''}" >
+            <xacro:property name="tf_prefix" value="''" />
+        </xacro:unless>
+        <!-- =========================== -->
+        <!-- Rotation Corrrection Plate  -->
+        <!-- =========================== -->
+        <material name="grass_green">
+            <color rgba="${120/255} ${163/255} ${44/255} 1"/>
+        </material>
+
+        <!-- links -->
+        <link name="${tf_prefix}base"/>
+        <link name='${tf_prefix}body'>
+            <visual>
+                <material name="grass_green"/>
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <geometry>
+                    <mesh filename="${mesh_base_path}/rotation-correction-plate/RotationCorrectionPlate.STL"/>
+                </geometry>
+            </visual>
+            <collision>
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <geometry>
+                    <mesh filename="${mesh_base_path}/rotation-correction-plate/RotationCorrectionPlate.STL"/>
+                </geometry>
+            </collision>
+            <inertial>
+                <mass value="${rotation_correction_plate_mass}"/>
+                <origin xyz="0.0 0.0 0.0"/>
+                <inertia ixx="0.0001" ixy="0.0" ixz="0.0" iyy="0.0001" iyz="0.0" izz="0.0001"/>
+            </inertial>
+        </link>
+        <link name="${tf_prefix}tool0"/>
+        <!-- joints -->
+        <joint name="${parent_link}--${tf_prefix}base" type="fixed">
+            <origin xyz="0 0 0" rpy="${rotation_correction_plate_rot_offset}"/>
+            <parent link="${parent_link}"/>
+            <child link="${tf_prefix}base"/>
+        </joint>
+        <joint name="${tf_prefix}base--body" type="fixed">
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <parent link="${tf_prefix}base"/>
+            <child link="${tf_prefix}body"/>
+        </joint>
+        <joint name="${tf_prefix}body--tool0" type="fixed">
+            <origin xyz="0 0 ${rotation_correction_plate_tool0_height}" rpy="0 0 0"/>
+            <parent link="${tf_prefix}body"/>
+            <child link="${tf_prefix}tool0"/>
+        </joint>
+    </xacro:macro>
+
+</robot>

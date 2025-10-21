@@ -5,12 +5,16 @@ from typing import Union, List, Tuple
 import numpy as np
 
 
-def compute_perpendicular_projection_vector(ab: NDArray[Shape["3, 1"], Float], bc: NDArray[Shape["3, 1"], Float]):
+def compute_perpendicular_projection_vector(
+    ab: NDArray[Shape["3, 1"], Float], bc: NDArray[Shape["3, 1"], Float]
+):
     projection = ab - np.dot(ab, bc) / np.dot(bc, bc) * bc
     return projection
 
 
-def seperate_rgbd_rgb_d(rgbd: List, height: int, width: int) -> Tuple[NDArray, NDArray]:
+def seperate_rgbd_rgb_d(
+    rgbd: List, height: int, width: int
+) -> Tuple[NDArray, NDArray]:
     """Seperate rgb and depth from the rgbd image, return RGB and depth"""
     rgb = np.array(rgbd[2]).reshape(height, width, 4) / 255
     rgb = rgb[:, :, :3]
@@ -41,7 +45,9 @@ def get_fov_from_dfov(
         if key == "degrees":
             pass
         if val <= 0:
-            raise ValueError(f"Parameter '{key}' cannot be less than 0. Value: {val}")
+            raise ValueError(
+                f"Parameter '{key}' cannot be less than 0. Value: {val}"
+            )
     if degrees:
         _dfov = np.deg2rad(dFoV)
     else:
