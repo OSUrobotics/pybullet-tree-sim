@@ -14,6 +14,11 @@ Path planning with RRT-connect and having a visibility check. These results for 
 ## (3) Expert Data Generation Pipeline: 
 Implemented a two-stage pipeline (planner and generator) that converts joint-space waypoints to end-effector velocity commands using Jacobian-based transformations, executes closed-loop trajectories with feedback, and stores multi-modal observations (RGB images, point masks, joint states, goal positions) with optical flow in HDF5 format for efficient dataset management. 
 
+### 🎥 Demo Video
+Click below to watch the demo:
+[![Watch the video](https://img.youtube.com/vi/AE1qpv3drOY/0.jpg)](https://youtu.be/AE1qpv3drOY)
+
+
 ## (4) Deep Reinforcement Learning Training: 
 Designed and implemented a RecurrentPPOAEWithExpert architecture combining Proximal Policy Optimization (PPO) with Long Short-Term Memory (LSTM) networks for temporal reasoning, integrated with online behavioral cloning (BC) using offline expert demonstrations. The model employs a convolutional encoder for RGB feature extraction, supports optical flow for motion understanding, uses a dual-LSTM architecture (actor and critic), and includes a custom imitation learning callback that dynamically reconfigures scene conditions from expert trajectories during training. 
 ### RL Agent training results (minimal)
