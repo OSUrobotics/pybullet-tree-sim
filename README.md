@@ -1,7 +1,32 @@
 # Apple picking path planner and trajectory generator for PyBullet sim env (feature)
 
+## (1) Simulation Environment Development: 
+Extended the PyBullet-based tree simulation to support a 6-DoF UR5 manipulator with an end-effector gripper, RGB-D camera sensor, and a detailed tree model with apples and leaves enabling realistic orchard manipulation scenarios. 
+
+## (2) Perception-Integrated Path Planning: 
+Developed a collision-free RRT-Connect planner with a novel camera-based visibility validation system to ensure the end-effector maintains visual contact with targets throughout the trajectory and to ensure natural arm movement for the imitation learning task. The planner incorporates collision checking, multiple inverse kinematics candidate generation with orientation perturbation, and task-space path refinement for smooth trajectories. 
+## Quantitative results (minimal) 
+Path planning with RRT-connect and having a visibility check. These results for a few samples show that using the visibility check leads to smooth and shorter paths.
+<img width="611" height="323" alt="a" src="https://github.com/user-attachments/assets/777a51b1-32f6-46cc-8ee3-da2962835a5e" />
+<img width="607" height="302" alt="b" src="https://github.com/user-attachments/assets/0acfd649-5a08-41ac-a322-1b3216a875ba" />
+
+(3) Expert Data Generation Pipeline: 
+Implemented a two-stage pipeline (planner and generator) that converts joint-space waypoints to end-effector velocity commands using Jacobian-based transformations, executes closed-loop trajectories with feedback, and stores multi-modal observations (RGB images, point masks, joint states, goal positions) with optical flow in HDF5 format for efficient dataset management. 
+
+(4) Deep Reinforcement Learning Training: 
+Designed and implemented a RecurrentPPOAEWithExpert architecture combining Proximal Policy Optimization (PPO) with Long Short-Term Memory (LSTM) networks for temporal reasoning, integrated with online behavioral cloning (BC) using offline expert demonstrations. The model employs a convolutional encoder for RGB feature extraction, supports optical flow for motion understanding, uses a dual-LSTM architecture (actor and critic), and includes a custom imitation learning callback that dynamically reconfigures scene conditions from expert trajectories during training. 
+### RL Agent training results (minimal)
+Trained only on 4 trajectories.
+<img width="1773" height="925" alt="image" src="https://github.com/user-attachments/assets/a349a3c4-370a-4f58-99cc-1edd840a6f18" />
+<img width="1765" height="973" alt="image" src="https://github.com/user-attachments/assets/9fbf6f2b-6ba7-4dc6-8105-bfbab07a4b8e" />
+
+
+
 ### Demo (YouTube) [7/10/2025]:
 [![Watch the video](https://img.youtube.com/vi/L9cdALAOvzs/maxresdefault.jpg)](https://www.youtube.com/watch?v=L9cdALAOvzs)
+
+
+
 
 
 ## Script Description: 
