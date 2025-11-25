@@ -1,5 +1,10 @@
 # Perception-Guided Motion Planning and Deep Reinforcement Learning for Robotic Fruit Harvesting
 
+### 🎥 Demo Video
+Click below to watch the demo:
+
+[![Watch the video](https://img.youtube.com/vi/AE1qpv3drOY/0.jpg)](https://youtu.be/AE1qpv3drOY)
+
 ## (1) Simulation Environment Development: 
 Extended the PyBullet-based tree simulation to support a 6-DoF UR5 manipulator with an end-effector gripper, RGB-D camera sensor, and a detailed tree model with apples and leaves, enabling realistic orchard manipulation scenarios. 
 
@@ -13,10 +18,6 @@ Path planning with RRT-connect and having a visibility check. These results for 
 
 ## (3) Expert Data Generation Pipeline: 
 Implemented a two-stage pipeline (planner and generator) that converts joint-space waypoints to end-effector velocity commands using Jacobian-based transformations, executes closed-loop trajectories with feedback, and stores multi-modal observations (RGB images, point masks, joint states, goal positions) with optical flow in HDF5 format for efficient dataset management. 
-
-### 🎥 Demo Video
-Click below to watch the demo:
-[![Watch the video](https://img.youtube.com/vi/AE1qpv3drOY/0.jpg)](https://youtu.be/AE1qpv3drOY)
 
 
 ## (4) Deep Reinforcement Learning Training: 
