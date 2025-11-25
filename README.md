@@ -1,19 +1,20 @@
-# Apple picking path planner and trajectory generator for PyBullet sim env (feature)
+# Perception-Guided Motion Planning and Deep Reinforcement Learning for Robotic Fruit Harvesting
 
 ## (1) Simulation Environment Development: 
-Extended the PyBullet-based tree simulation to support a 6-DoF UR5 manipulator with an end-effector gripper, RGB-D camera sensor, and a detailed tree model with apples and leaves enabling realistic orchard manipulation scenarios. 
+Extended the PyBullet-based tree simulation to support a 6-DoF UR5 manipulator with an end-effector gripper, RGB-D camera sensor, and a detailed tree model with apples and leaves, enabling realistic orchard manipulation scenarios. 
 
 ## (2) Perception-Integrated Path Planning: 
 Developed a collision-free RRT-Connect planner with a novel camera-based visibility validation system to ensure the end-effector maintains visual contact with targets throughout the trajectory and to ensure natural arm movement for the imitation learning task. The planner incorporates collision checking, multiple inverse kinematics candidate generation with orientation perturbation, and task-space path refinement for smooth trajectories. 
 ## Quantitative results (minimal) 
 Path planning with RRT-connect and having a visibility check. These results for a few samples show that using the visibility check leads to smooth and shorter paths.
-<img width="611" height="323" alt="a" src="https://github.com/user-attachments/assets/777a51b1-32f6-46cc-8ee3-da2962835a5e" />
-<img width="607" height="302" alt="b" src="https://github.com/user-attachments/assets/0acfd649-5a08-41ac-a322-1b3216a875ba" />
+<img width="607" height="302" alt="b" src="https://github.com/user-attachments/assets/39227fa1-7b1f-4339-bf74-8f82256d234d" />
+<img width="611" height="323" alt="a" src="https://github.com/user-attachments/assets/daf5f68a-cadd-4709-ad36-fe1d9446745a" />
 
-(3) Expert Data Generation Pipeline: 
+
+## (3) Expert Data Generation Pipeline: 
 Implemented a two-stage pipeline (planner and generator) that converts joint-space waypoints to end-effector velocity commands using Jacobian-based transformations, executes closed-loop trajectories with feedback, and stores multi-modal observations (RGB images, point masks, joint states, goal positions) with optical flow in HDF5 format for efficient dataset management. 
 
-(4) Deep Reinforcement Learning Training: 
+## (4) Deep Reinforcement Learning Training: 
 Designed and implemented a RecurrentPPOAEWithExpert architecture combining Proximal Policy Optimization (PPO) with Long Short-Term Memory (LSTM) networks for temporal reasoning, integrated with online behavioral cloning (BC) using offline expert demonstrations. The model employs a convolutional encoder for RGB feature extraction, supports optical flow for motion understanding, uses a dual-LSTM architecture (actor and critic), and includes a custom imitation learning callback that dynamically reconfigures scene conditions from expert trajectories during training. 
 ### RL Agent training results (minimal)
 Trained only on 4 trajectories.
