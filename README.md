@@ -12,9 +12,11 @@ Extended the PyBullet-based tree simulation to support a 6-DoF UR5 manipulator w
 Developed a collision-free RRT-Connect planner with a novel camera-based visibility validation system to ensure the end-effector maintains visual contact with targets throughout the trajectory and to ensure natural arm movement for the imitation learning task. The planner incorporates collision checking, multiple inverse kinematics candidate generation with orientation perturbation, and task-space path refinement for smooth trajectories. 
 ## Quantitative results (minimal) 
 Path planning with RRT-connect and having a visibility check. These results for a few samples show that using the visibility check leads to smooth and shorter paths.
-<img width="607" height="302" alt="b" src="https://github.com/user-attachments/assets/39227fa1-7b1f-4339-bf74-8f82256d234d" />
-<img width="611" height="323" alt="a" src="https://github.com/user-attachments/assets/daf5f68a-cadd-4709-ad36-fe1d9446745a" />
 
+<img width="1600" height="1067" alt="Code_Generated_Image" src="https://github.com/user-attachments/assets/e6b586bb-6699-4a35-af90-d80e48d677c7" />
+<img width="1600" height="533" alt="Code_Generated_Image (3)" src="https://github.com/user-attachments/assets/0a9441a6-18b1-4d79-bae9-27bc6700f19e" />
+<img width="1600" height="533" alt="Code_Generated_Image (2)" src="https://github.com/user-attachments/assets/55efbf3d-d26a-4d99-a6df-313dfa7a7e4b" />
+<img width="1400" height="800" alt="Code_Generated_Image (1)" src="https://github.com/user-attachments/assets/c52dea6d-ebed-46d0-9e2b-fc212a6277ca" />
 
 ## (3) Expert Data Generation Pipeline: 
 Implemented a two-stage pipeline (planner and generator) that converts joint-space waypoints to end-effector velocity commands using Jacobian-based transformations, executes closed-loop trajectories with feedback, and stores multi-modal observations (RGB images, point masks, joint states, goal positions) with optical flow in HDF5 format for efficient dataset management. 
