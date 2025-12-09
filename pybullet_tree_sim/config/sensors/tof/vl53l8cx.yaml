@@ -1,8 +1,21 @@
-name: "VL53L8CX"
+model: "vl53l8cx"
 data_type: "d"
+mass: 0.0007 # kg
+dimensions:
+  shape: box
+  x: 0.0127
+  y: 0.02286
+  z: 0.00254
 depth:
-    dfov: 65.0
-    near_plane: 0.03
-    far_plane: 3.4
-    width: 8
-    height: 8
+  dfov: 65.0
+  near_plane: 0.03
+  far_plane: 3.4
+  width: 640
+  height: 480
+  sensing_unit_offset:
+    x: 0.0001
+    y: -0.001695
+    z: 0.002776
+    roll: 0.0
+    pitch: 0.0
+    yaw: -1.57079632679

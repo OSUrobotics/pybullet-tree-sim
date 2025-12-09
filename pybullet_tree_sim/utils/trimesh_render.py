@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Requires: pip install trimesh pyrender numpy
 from pybullet_tree_sim import MESHES_PATH
+from pybullet_tree_sim.utils.mesh_objects import MeshObjects
 from pybullet_tree_sim.sensors.optical_sensor import OpticalSensor
 import trimesh
 import pyrender
@@ -21,81 +22,19 @@ class RenderScene:
 
         # Convert timesh to pyrender mesh
         self.mesh = pyrender.Mesh.from_trimesh(mesh, smooth=False)
-        self.mesh_node = self.scene.add(self.mesh)
+        self.mesh_node: pyrender.Node = self.scene.add(self.mesh)
 
         # Active camera nodes
-        self.camera_nodes = {}
+        self.sensor_nodes = {}
 
         # Renderer
         self.renderer = None
         return
 
-    @staticmethod
-    def load_mesh(mesh_path: str) -> trimesh.Trimesh:
-        """Load a mesh from a path
-
-        :param mesh_path: Mesh path
-        :type mesh_path: str
-        :return: Trimesh object of the mesh
-        :rtype: trimesh.Trimesh
-        """
-        mesh = trimesh.load(
-            mesh_path, process=False
-        )  # process=False keeps vertex sharing as in file
-        return mesh
-
-    @staticmethod
-    def recolor_mesh(mesh: trimesh.Trimesh) -> trimesh.Trimesh:
-        """Duplicate vertices per-face so each face can get a flat color (no vertex-sharing)
-        This ensures a unique set of vertices per triangle so color doesn't interpolate across adjacent faces.
-
-        :param mesh: Trimesh object
-        :type mesh: trimesh.Trimesh
-        :return: A recolored trimesh object
-        :rtype: trimesh.Trimesh
-        """
-        faces = mesh.faces
-        n_faces = faces.shape[0]
-        verts_per_face = mesh.vertices[faces]  # shape (n_faces, 3, 3)
-        new_vertices = verts_per_face.reshape(-1, 3)  # (n_faces*3, 3)
-        new_faces = np.arange(len(new_vertices)).reshape(-1, 3)  # (n_faces, 3)
-
-        # Encode face IDs into 24-bit RGB colors (reserve a background id 0 if you like)
-        ids = np.arange(n_faces, dtype=np.uint32)
-        r = (ids >> 16) & 0xFF
-        g = (ids >> 8) & 0xFF
-        b = ids & 0xFF
-        face_colors = np.stack([r, g, b, np.full_like(r, 255)], axis=1).astype(
-            np.uint8
-        )  # RGBA per-face
-
-        # Because we duplicated vertices (3 per face), create per-vertex colors by repeating each face color 3x
-        vertex_colors = np.repeat(
-            face_colors, 3, axis=0
-        )  # shape (n_faces*3, 4)
-
-        # Make a new trimesh with per-vertex colors
-        flat_mesh = trimesh.Trimesh(
-            vertices=new_vertices, faces=new_faces, process=False
-        )
-        flat_mesh.visual.vertex_colors = vertex_colors
-        flat_mesh
-        return flat_mesh
-
-    @staticmethod
-    def export_obj(
-        mesh: trimesh.Trimesh,
-        filename: str,
-        dir_path: str = f"{MESHES_PATH}/tmp",
-    ) -> None:
-        export_path = os.path.join(dir_path, filename)
-        mesh.export(f"{export_path}", file_type="obj")
-        return
-
     def add_camera(
         self,
         camera: OpticalSensor,
-        extrinsics: np.ndarray,
+        pose: np.ndarray,
         camera_name: str,
         mode: str = "rgb",
     ) -> None:
@@ -104,8 +43,8 @@ class RenderScene:
 
         :param camera: An object derived from base class OpticalSensor. Options include DepthSensor, RGBCamera, DepthCamera
         :type camera: OpticalSensor
-        :param extrinsics: A matrix describing the camera extrinsics, RT
-        :type extrinsics: np.ndarray
+        :param pose: A matrix describing the camera pose to world, RT
+        :type pose: np.ndarray
         :param camera_name: Name of the camera. Needed for adding/deleting cameras from the scene
         :type camera_name: str
         """
@@ -119,41 +58,43 @@ class RenderScene:
             cy=camera_intrinsics["cy"],
             znear=camera_intrinsics["znear"],
             zfar=camera_intrinsics["zfar"],
+            name=camera.sensor_name,
         )
 
-        camera_node = self.scene.add(pyr_camera, pose=extrinsics)
-        self.camera_nodes[camera_name] = camera_node
+        camera_node = self.scene.add(pyr_camera, pose=pose)
+        self.sensor_nodes[camera_name] = camera_node
 
         return
 
     def remove_camera(self, camera_name: str) -> None:
         """Remove a camera from the PyRender scene"""
-        if camera_name in self.camera_nodes:
-            self.scene.remove_node(self.camera_nodes[camera_name])
-            del self.camera_nodes[camera_name]
+        if camera_name in self.sensor_nodes:
+            self.scene.remove_node(self.sensor_nodes[camera_name])
+            del self.sensor_nodes[camera_name]
         return
 
-    def update_camera_pose(
-        self, camera_name: str, extrinsics: np.ndarray
-    ) -> None:
+    def update_camera_pose(self, camera_name: str, pose: np.ndarray) -> None:
         """Update the pose of an existing camera"""
-        if camera_name in self.camera_nodes:
-            self.scene.set_pose(self.camera_nodes[camera_name], pose=extrinsics)
+        if camera_name in self.sensor_nodes:
+            self.scene.set_pose(self.sensor_nodes[camera_name], pose=pose)
         return
 
     def render_visual(self) -> None:
-        self.scene.add(self.mesh)
+        """Render the scene using the interactive viewer"""
         pyrender.Viewer(self.scene)
         return
 
-    def render_camera(self, camera_name: str) -> None:
-        if camera_name not in self.camera_nodes:
-            raise ValueError(f"Camera '{camera_name}' not found in scene.")
+    def render_optical_sensor(self, sensor: OpticalSensor) -> None:
+        if sensor.sensor_name not in self.sensor_nodes:
+            raise ValueError(f"Camera '{sensor.sensor_name}' not found in scene.")
 
-        # Get camera
-        camera_node = self.camera_nodes[camera_name]
-        camera = self.scene.get_nodes(node=camera_node)[0]
-        return
+        self.renderer = pyrender.OffscreenRenderer(
+            viewport_width=sensor.depth_width, viewport_height=sensor.depth_height
+        )
+        color, depth = self.renderer.render(
+            scene=self.scene, flags=pyrender.RenderFlags.FLAT | pyrender.RenderFlags.SKIP_CULL_FACES
+        )
+        return color, depth
 
     def render_lidar_scan(self, mesh, lidar_sensor, extrinsics):
         """
@@ -202,10 +143,10 @@ class RenderScene:
 def main():
     __here__ = os.path.dirname(os.path.dirname(__file__))
     mesh_path = f"{__here__}/meshes/trees/LPy_envy_00000.ply"
-    mesh = RenderScene.load_mesh(mesh_path=mesh_path)
-    color_mesh = RenderScene.recolor_mesh(mesh=mesh)
-    RenderScene.export_obj(mesh=color_mesh, filename="test.obj")
-    RenderScene.render_visual(color_mesh)
+    color_mesh = MeshObjects.color_unique_faces(mesh_path=mesh_path)
+    MeshObjects.export_obj(mesh=color_mesh, filename="test.obj")
+    scene = RenderScene(color_mesh)
+    scene.render_visual()
     return
 
 

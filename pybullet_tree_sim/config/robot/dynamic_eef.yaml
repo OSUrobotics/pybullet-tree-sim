@@ -1,0 +1,11 @@
+dynamic_eef_tf_prefix: dynamic_eef
+sensors:
+  tof0:
+    type: tof
+    model: vl53l8cx
+    # x_offset: "0.02"
+    tf_frame: "tof0"
+    pan: 0.0
+    tilt: 0.0
+    position: "0.0 0.0 0.0"
+    orientation: "0.0 0.0 0.0"

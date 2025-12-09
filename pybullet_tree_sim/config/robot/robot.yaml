@@ -3,7 +3,8 @@ robot_stack:
     # - cart
     - linear_slider
     - ur5e
-    - mock_pruner
+    # - mock_pruner
+    - dynamic_eef
 # initial_joint_angles:
 #     - 0.0
 #     - 0.0

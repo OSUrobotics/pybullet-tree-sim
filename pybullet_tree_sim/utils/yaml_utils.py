@@ -29,7 +29,5 @@ def load_yaml(file_path) -> dict | None:
     try:
         with open(file_path) as file:
             return yaml.safe_load(file)
-    except (
-        OSError
-    ):  # parent of IOError, OSError *and* WindowsError where available
+    except OSError:  # parent of IOError, OSError *and* WindowsError where available
         return None

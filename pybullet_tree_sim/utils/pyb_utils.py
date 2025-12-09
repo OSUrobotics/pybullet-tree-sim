@@ -93,37 +93,25 @@ class PyBUtils:
             baseVisualShapeIndex=wall_viz,
             baseCollisionShapeIndex=wall_col,
             basePosition=wall_pos,
-            baseOrientation=list(
-                self.pbclient.getQuaternionFromEuler(euler_rotation)
-            ),
+            baseOrientation=list(self.pbclient.getQuaternionFromEuler(euler_rotation)),
         )
-        self.pbclient.changeVisualShape(
-            objectUniqueId=wall_id, linkIndex=-1, textureUniqueId=wall_texture
-        )
+        self.pbclient.changeVisualShape(objectUniqueId=wall_id, linkIndex=-1, textureUniqueId=wall_texture)
         return wall_id
 
     def create_background(self) -> None:
         wall_texture_path = os.path.join(TEXTURES_PATH, "leaves-dead.png")
         self.wall_texture = self.pbclient.loadTexture(wall_texture_path)
 
-        self.floor_id = self.create_wall_with_texture(
-            [0.01, 5, 5], [0, 0, 0], [0, np.pi / 2, 0], self.wall_texture
-        )
+        self.floor_id = self.create_wall_with_texture([0.01, 5, 5], [0, 0, 0], [0, np.pi / 2, 0], self.wall_texture)
         self.wall_id = self.create_wall_with_texture(
             [0.01, 5, 5],
             [0, -2, 5],
             [np.pi / 2, 0, np.pi / 2],
             self.wall_texture,
         )
-        self.side_wall_1_id = self.create_wall_with_texture(
-            [0.01, 5, 5], [-5, 0, 5], [0, 0, 0], self.wall_texture
-        )
-        self.side_wall_2_id = self.create_wall_with_texture(
-            [0.01, 5, 5], [5, 0, 5], [0, 0, 0], self.wall_texture
-        )
-        self.ceil_id = self.create_wall_with_texture(
-            [0.01, 5, 5], [0, 0, 10], [0, np.pi / 2, 0], self.wall_texture
-        )
+        self.side_wall_1_id = self.create_wall_with_texture([0.01, 5, 5], [-5, 0, 5], [0, 0, 0], self.wall_texture)
+        self.side_wall_2_id = self.create_wall_with_texture([0.01, 5, 5], [5, 0, 5], [0, 0, 0], self.wall_texture)
+        self.ceil_id = self.create_wall_with_texture([0.01, 5, 5], [0, 0, 10], [0, np.pi / 2, 0], self.wall_texture)
         return
 
     def remove_debug_items(self, where) -> None:
@@ -150,12 +138,8 @@ class PyBUtils:
 
     def add_sphere(self, radius: float, pos: List, rgba: List) -> int:
         colSphereId = -1
-        visualShapeId = self.pbclient.createVisualShape(
-            self.pbclient.GEOM_SPHERE, radius=radius, rgbaColor=rgba
-        )
-        sphereUid = self.pbclient.createMultiBody(
-            0.0, colSphereId, visualShapeId, pos, [0, 0, 0, 1]
-        )
+        visualShapeId = self.pbclient.createVisualShape(self.pbclient.GEOM_SPHERE, radius=radius, rgbaColor=rgba)
+        sphereUid = self.pbclient.createMultiBody(0.0, colSphereId, visualShapeId, pos, [0, 0, 0, 1])
         return sphereUid
 
     # def setup_bird_view_visualizer(self):
@@ -171,9 +155,7 @@ class PyBUtils:
     def linearize_depth(depth: NDArray, far_val: float, near_val: float):
         """OpenGL returns contracted depth, linearize it"""
         try:
-            depth_linearized = (
-                far_val * near_val / (far_val - (far_val - near_val) * depth)
-            )
+            depth_linearized = far_val * near_val / (far_val - (far_val - near_val) * depth)
         except ZeroDivisionError:
             log.warning("Encountered division by 0 in depth linearization.")
             depth_linearized = None
@@ -223,9 +205,7 @@ class PyBUtils:
     def visualize_rot_mat(self, rot_mat: List, pos):
         # if rot_mat is Tuple:
         if isinstance(rot_mat, tuple) or len(rot_mat) == 4:
-            rot_mat = np.array(
-                self.pbclient.getMatrixFromQuaternion(rot_mat)
-            ).reshape(3, 3)
+            rot_mat = np.array(self.pbclient.getMatrixFromQuaternion(rot_mat)).reshape(3, 3)
         dx = 0.1
         colors = np.eye(3)
         for i in range(3):

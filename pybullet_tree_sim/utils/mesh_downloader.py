@@ -7,11 +7,7 @@ from tqdm import tqdm
 import zipfile
 
 
-proj_src_path = os.path.dirname(
-    os.path.dirname(
-        os.path.dirname(os.path.dirname(os.path.dirname(PROJECT_PATH)))
-    )
-)
+proj_src_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(PROJECT_PATH)))))
 meshes_path = os.path.join(proj_src_path, "pybullet_tree_sim", "meshes")
 
 
@@ -27,14 +23,10 @@ def is_download_needed(target_file_path: str) -> bool:
         return True
 
     if not os.path.exists(os.path.join(meshes_path, "trees")):
-        if not os.path.isfile(
-            os.path.join(meshes_path, "pybullet-tree-sim-meshes.zip")
-        ):  # TODO: pass name into func
+        if not os.path.isfile(os.path.join(meshes_path, "pybullet-tree-sim-meshes.zip")):  # TODO: pass name into func
             return True
         else:
-            print(
-                f"File {os.path.join(meshes_path, 'pybullet-tree-sim-meshes.zip')} already exists"
-            )
+            print(f"File {os.path.join(meshes_path, 'pybullet-tree-sim-meshes.zip')} already exists")
             return False
     else:
         print(f"Path {os.path.join(meshes_path, 'trees')} already exists.")
@@ -54,9 +46,7 @@ def download_file(url: str, target_file_path: str) -> bool:
         with requests.get(url, stream=True) as r:
             r.raise_for_status()
             total_size = int(r.headers.get("content-length", 0))
-            with tqdm(
-                total=total_size, unit="B", unit_scale=True
-            ) as progress_bar:
+            with tqdm(total=total_size, unit="B", unit_scale=True) as progress_bar:
                 with open(target_file_path, "wb") as f:
                     for chunk in r.iter_content(chunk_size=8192):
                         # If you have chunk encoded response uncomment if
@@ -79,16 +69,12 @@ def unzip(zip_file: str):
     print(f"Files extracted")
 
     if not os.path.exists(meshes_path):
-        print(
-            f"Cannot find path {meshes_path}, error with process. Try running the file directly."
-        )
+        print(f"Cannot find path {meshes_path}, error with process. Try running the file directly.")
     return
 
 
 def main():
-    url = (
-        "https://zenodo.org/records/14991250/files/pybullet-tree-sim-meshes.zip"
-    )
+    url = "https://zenodo.org/records/14991250/files/pybullet-tree-sim-meshes.zip"
 
     file_abs_path = get_filename_from_url(url=url)
 
