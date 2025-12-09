@@ -19,9 +19,7 @@ from zenlog import log
 
 
 class DepthCamera(RGBCamera, DepthSensor):
-    def __init__(
-        self, sensor_type: str = "depth_camera", *args, **kwargs
-    ) -> None:
+    def __init__(self, sensor_type: str = "depth_camera", *args, **kwargs) -> None:
         super().__init__(sensor_type=sensor_type, *args, **kwargs)
 
         rgb_params = self.params.get("rgb", {})
@@ -44,12 +42,8 @@ class DepthCamera(RGBCamera, DepthSensor):
         @param mode: The sensor mode option. Choices are 'rgb' or 'depth'
         """
         if mode == "depth":
-            fx = self.depth_width / (
-                2 * np.tan(np.radians(self.depth_hfov) / 2)
-            )
-            fy = self.depth_height / (
-                2 * np.tan(np.radians(self.depth_vfov) / 2)
-            )
+            fx = self.depth_width / (2 * np.tan(np.radians(self.depth_hfov) / 2))
+            fy = self.depth_height / (2 * np.tan(np.radians(self.depth_vfov) / 2))
         return
 
 
@@ -57,9 +51,7 @@ def main():
     import pprint as pp
 
     pbutils = PyBUtils(renders=False)
-    dcamera = DepthCamera(
-        pbclient=pbutils.pbclient, sensor_name="realsense_d435i"
-    )
+    dcamera = DepthCamera(pbclient=pbutils.pbclient, sensor_name="realsense_d435i")
     print(DepthCamera.__mro__)
     print(dcamera.get_camera_intrinsics(mode="depth"))
     pp.pprint(dcamera.params)

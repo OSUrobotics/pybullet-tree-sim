@@ -21,25 +21,17 @@ class RGBCamera(OpticalSensor):
             self.rgb_hfov = self.params["rgb"]["hfov"]
         except KeyError:
             self.rgb_dfov = self.params["rgb"]["dfov"]
-            self.rgb_hfov, self.rgb_vfov = ch.get_fov_from_dfov(
-                self.rgb_width, self.rgb_height, self.rgb_dfov
-            )
+            self.rgb_hfov, self.rgb_vfov = ch.get_fov_from_dfov(self.rgb_width, self.rgb_height, self.rgb_dfov)
 
         self.near_val = self.params["rgb"]["near_plane"]
         self.far_val = self.params["rgb"]["far_plane"]
 
         # Pixel coordinates, indexed by depth_width, depth_height, nx1 array COLUMN MAJOR
-        self.rgb_pixel_coords = np.array(
-            list(np.ndindex((self.rgb_width, self.rgb_height))), dtype=int
-        )
+        self.rgb_pixel_coords = np.array(list(np.ndindex((self.rgb_width, self.rgb_height))), dtype=int)
         # Film coordinates projected to [-1, 1], nx1 array COLUMN MAJOR
         self.rgb_film_coords = (
             2
-            * (
-                self.rgb_pixel_coords
-                + np.array([0.5, 0.5])
-                - np.array([self.rgb_width / 2, self.rgb_height / 2])
-            )
+            * (self.rgb_pixel_coords + np.array([0.5, 0.5]) - np.array([self.rgb_width / 2, self.rgb_height / 2]))
             / np.array([self.rgb_width, self.rgb_height])
         )
 

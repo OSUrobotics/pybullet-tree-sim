@@ -1,0 +1,117 @@
+<?xml version ="1.0"?>
+<robot xmlns:xacro="http://wiki.ros.org/xacro" name="pruning_robot">
+
+  <xacro:macro name="dynamic_eef_macro" params="dynamic_eef_tf_prefix sensor_qty parent_link mesh_base_path urdf_base_path" >
+    <xacro:if value="${ str(dynamic_eef_tf_prefix) != ''}" >
+      <xacro:property name="tf_prefix" value="${dynamic_eef_tf_prefix}__"/>
+    </xacro:if>
+    <xacro:unless value="${ str(dynamic_eef_tf_prefix) != ''}" >
+      <xacro:property name="tf_prefix" value="''" />
+    </xacro:unless>
+
+    <material name="bright_orange">
+      <color rgba="${247/255} ${135/255} ${38/255} 1"/>
+    </material>
+
+    <!-- Base link -->
+    <link name="${tf_prefix}base" />
+
+    <!-- Parent joint -->
+    <joint name="${parent_link}--${tf_prefix}base" type="fixed">
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0" />
+      <parent link="${parent_link}" />
+      <child link="${tf_prefix}base" />
+    </joint>
+
+    <xacro:macro name="sensor_assignment_loop" params="sensor_qty mesh_base_path urdf_base_path">
+      <xacro:if value="${sensor_qty}">
+        <xacro:arg name="sensor${sensor_qty}_name" default='' />
+        <xacro:arg name="sensor${sensor_qty}_model" default='' />
+        <xacro:arg name="sensor${sensor_qty}_position" default='' />
+        <xacro:arg name="sensor${sensor_qty}_orientation" default='' />
+        <xacro:arg name="sensor${sensor_qty}_mass" default="" />
+        <xacro:arg name="sensor${sensor_qty}_shape" default="" />
+        <xacro:arg name="sensor${sensor_qty}_dim_x" default="" />
+        <xacro:arg name="sensor${sensor_qty}_dim_y" default="" />
+        <xacro:arg name="sensor${sensor_qty}_dim_z" default="" />
+        <xacro:arg name="sensor${sensor_qty}_base__sensing_unit_xyz_offset" default="0.0 0.0 0.0" />
+        <xacro:arg name="sensor${sensor_qty}_base__sensing_unit_rpy_offset" default="0.0 0.0 0.0" />
+
+        <xacro:property name="resolved_link_name" value="$(arg sensor${sensor_qty}_name)" />
+        <xacro:property name="resolved_sensor_model" value="$(arg sensor${sensor_qty}_model)" />
+        <xacro:property name="resolved_position" value="$(arg sensor${sensor_qty}_position)"/>
+        <xacro:property name="resolved_orientation" value="$(arg sensor${sensor_qty}_orientation)"/>
+        <xacro:property name="resolved_mass" value="$(arg sensor${sensor_qty}_mass)" />
+        <xacro:property name="resolved_shape" value="$(arg sensor${sensor_qty}_shape)" />
+        <xacro:property name="resolved_dim_x" value="$(arg sensor${sensor_qty}_dim_x)" />
+        <xacro:property name="resolved_dim_y" value="$(arg sensor${sensor_qty}_dim_y)" />
+        <xacro:property name="resolved_dim_z" value="$(arg sensor${sensor_qty}_dim_z)" />
+        <xacro:property
+          name="resolved_base__sensing_unit_xyz_offset"
+          value="$(arg sensor${sensor_qty}_base__sensing_unit_xyz_offset)"
+        />
+        <xacro:property
+          name="resolved_base__sensing_unit_rpy_offset"
+          value="$(arg sensor${sensor_qty}_base__sensing_unit_rpy_offset)"
+        />
+
+        <!-- Links -->
+        <link name="${tf_prefix}${resolved_link_name}_base">
+          <visual>
+            <material name="bright_orange"/>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+              <mesh filename="${mesh_base_path}/${resolved_sensor_model}/${resolved_sensor_model}.stl" scale="1.0"/>
+            </geometry>
+          </visual>
+          <collision>
+            <geometry>
+              <box size="${resolved_dim_x} ${resolved_dim_y} ${resolved_dim_z}"/>
+              <origin xyz="0 0 0" rpy="0 0 0"/>
+            </geometry>
+          </collision>
+          <inertial>
+            <mass value="${resolved_mass}" />
+            <origin xyz="0.0 0.0 0.0" />
+            <inertia
+              ixx="${1/12 * resolved_mass * (resolved_dim_y**2 + resolved_dim_z**2)}"
+              ixy="0.0"
+              ixz="0.0"
+              iyy="${1/12 * resolved_mass * (resolved_dim_x**2 + resolved_dim_z**2)}"
+              iyz="0.0"
+              izz="${1/12 * resolved_mass * (resolved_dim_x**2 + resolved_dim_y**2)}"
+            />
+          </inertial>
+        </link>
+
+        <link name="${tf_prefix}${resolved_link_name}_sensing_unit" />
+
+        <!-- Joints -->
+        <joint name="${tf_prefix}base--${tf_prefix}${resolved_link_name}_base" type="fixed">
+          <origin xyz="${resolved_position}" rpy="${resolved_orientation}" />
+          <parent link="${tf_prefix}base" />
+          <child link="${tf_prefix}${resolved_link_name}_base" />
+        </joint>
+
+        <joint name="${tf_prefix}${resolved_link_name}_base--${tf_prefix}${resolved_link_name}_sensing_unit" type="fixed">
+          <origin xyz="${resolved_base__sensing_unit_xyz_offset}" rpy="${resolved_base__sensing_unit_rpy_offset}"/>
+          <parent link="${tf_prefix}${resolved_link_name}_base"/>
+          <child link="${tf_prefix}${resolved_link_name}_sensing_unit" />
+        </joint>
+        
+        <xacro:sensor_assignment_loop
+          sensor_qty="${sensor_qty - 1}"
+          mesh_base_path="${mesh_base_path}"
+          urdf_base_path="${urdf_base_path}"
+        />
+      </xacro:if>
+    </xacro:macro>
+    <xacro:sensor_assignment_loop
+      sensor_qty="${sensor_qty}"
+      mesh_base_path="${mesh_base_path}"
+      urdf_base_path="${urdf_base_path}"
+    />
+    
+  </xacro:macro>
+
+</robot>

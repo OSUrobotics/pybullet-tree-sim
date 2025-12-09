@@ -8,36 +8,21 @@ authors: Abhinav Jain, Luke Strohbehn
 Generates a tree in PyBullet
 """
 from collections import defaultdict
-import glob
-import math
 import os
 from pathlib import Path
-import pickle
-from typing import Optional, Tuple, List
 import secrets
 import numpy as np
 import pybullet
-import pywavefront
 
-# from nptyping import NDArray, Shape, Float
 from numpy.typing import ArrayLike
 from pybullet_tree_sim import URDF_PATH, MESHES_PATH
 from pybullet_tree_sim.utils.pyb_utils import PyBUtils
-from pybullet_tree_sim.utils.camera_helpers import (
-    compute_perpendicular_projection_vector,
-)
-import pybullet_tree_sim.utils.trimesh_render as tmr
-from pybullet_tree_sim.utils import math_helpers as mh
+from pybullet_tree_sim.utils.mesh_objects import MeshObjects
 import pybullet_tree_sim.utils.xacro_utils as xutils
-from scipy.spatial.transform import Rotation
-import xacro
-import xml
+from pybullet_tree_sim.tree_metadata import TreeMetadata
+import tempfile
 
 from zenlog import log
-
-
-# from pruning_sb3.pruning_gym.helpers import roundup, rounddown
-# from memory_profiler import profile
 
 
 class TreeException(Exception):
@@ -60,65 +45,79 @@ class Tree:
 
     _tree_xacro_path = os.path.join(URDF_PATH, "tree", "tree.urdf.xacro")
     _tree_generated_urdf_path = os.path.join(URDF_PATH, "tree", "generated")
-    _tree_meshes_ply_path = os.path.join(MESHES_PATH, "trees")
-    _tree_meshes_obj_path = os.path.join(MESHES_PATH, "trees", "obj")
 
     def __init__(
         self,
         pbutils: PyBUtils,
-        tree_id: int | None = None,
-        tree_type: str | None = None,
+        meshes_root: str,
+        tree_id: int,
+        tree_type: str,
         namespace: str = "",
         parent: str = "world",
-        urdf_path: str | None = None,
-        obj_path: str | None = None,
-        labeled_tree_obj_path: str | None = None,
         position: np.ndarray = np.array([0, 0, 0]),
         orientation: np.ndarray = np.array([0, 0, 0, 1]),
         scale: float = 1.0,
         randomize_pose: bool = False,
-        verbose: bool = True,
         seed: int | None = None,
     ) -> None:
-        log.info("Creating Tree object")
+        # Set up temporary directory for tree files
+        self.temp_dir = tempfile.TemporaryDirectory()
+        log.info(f"Creating Tree object '{namespace}_{tree_type}_{tree_id}'.")
+
+        # PyBullet
         self.pbclient = pbutils.pbclient
+
         # Set seed
-        if seed is not None:
+        if seed is not None:  # TODO: Log this seed for reproducibility
             self.seed = seed
         else:
             self.seed = secrets.randbits(128)
-        self.generator: np.random.Generator = np.random.default_rng(
-            seed=self.seed
-        )
-        self.verbose = verbose
+        self.generator: np.random.Generator = np.random.default_rng(seed=self.seed)
 
         # Tree specific parameters
         self.scale = scale
-        self.tree_namespace = namespace
-        self.tree_id = tree_id
-        self.tree_type = tree_type
-        self.id_str = self.create_id_string(
-            tree_id=tree_id,
-            tree_type=tree_type,
-            namespace=namespace,
-            urdf_path=urdf_path,
-        )
-        self.urdf_path = os.path.join(
-            self._tree_generated_urdf_path, self.id_str + ".urdf"
-        )
-        self.ply_mesh_path = os.path.join(
-            self._tree_meshes_ply_path, self.id_str + ".ply"
-        )
-        self.obj_mesh_path = os.path.join(
-            self._tree_meshes_obj_path, self.id_str + ".obj"
-        )
-        self.init_pos = position
-        self.init_orientation = orientation
+        self.tree_namespace = namespace.lower().strip()
+        self.tree_id = str(tree_id).zfill(5)
+        self.tree_type = tree_type.lower().strip()
+        self.id_str = f"{self.tree_namespace}_{self.tree_type}_{self.tree_id}"
 
-        # Trimesh renderer
-        self.tm_renderer = None
-        # OBJ
-        self.convert_tree_ply_to_obj()
+        # set up paths
+        self._tree_meshes_ply_path = os.path.join(meshes_root, "trees", "ply")
+        self._tree_meshes_obj_path = os.path.join(meshes_root, "trees", "obj")
+        self._tree_meshes_metadata_path = os.path.join(meshes_root, "trees", "metadata")
+        self.urdf_path = os.path.join(self._tree_generated_urdf_path, self.id_str + ".urdf")
+        self.ply_mesh_path = os.path.join(self._tree_meshes_ply_path, self.id_str + ".ply")
+        self.obj_mesh_path = os.path.join(self._tree_meshes_obj_path, self.id_str + ".obj")
+        self.mesh_metadata_path = os.path.join(self._tree_meshes_metadata_path, self.id_str + "_metadata.json")
+
+        # Original raw mesh
+        self.raw_mesh = MeshObjects.load_mesh(self.ply_mesh_path)
+
+        # Tree metadata
+        tree_metadata = TreeMetadata(
+            tree_id=self.tree_id,
+            tree_type=self.tree_type,
+            namespace=self.tree_namespace,
+            tree_metadata_path=self.mesh_metadata_path,
+            tree_mesh=self.raw_mesh,
+        )
+        self.limbs = tree_metadata.limbs
+        self.cylinders = tree_metadata.cylinders
+
+        # Mesh with unique face colors
+        self.recolored_mesh = MeshObjects.color_and_convert_ply_to_obj(
+            ply_mesh_path=self.ply_mesh_path, obj_mesh_path=self.obj_mesh_path
+        )
+        import time
+
+        start_time = time.process_time()
+        self.faces = tree_metadata.get_faces(original_mesh=self.raw_mesh, recolored_mesh=self.recolored_mesh)
+        print(f"time: {time.process_time() - start_time}")
+        print(self.faces[64])
+        import sys
+
+        sys.exit(0)
+
         # URDF
         self.load_tree_urdf(scale=scale, parent=parent)
 
@@ -131,36 +130,9 @@ class Tree:
         else:
             new_pos = position
             new_orientation = orientation
-
         self.pos = new_pos
         self.orientation = new_orientation
         return
-
-    def create_id_string(
-        self,
-        tree_id: int | None = None,
-        tree_type: str | None = None,
-        namespace: str | None = None,
-        urdf_path: str | None = None,
-    ) -> str:
-        if tree_id is None and urdf_path is None:
-            # log.error("Both urdf_path and tree parameters cannot be None.")
-            raise TreeException(
-                "Both urdf_path and tree parameters cannot be None."
-            )
-
-        if tree_id is not None:
-            tree_id = str(tree_id).zfill(5)
-
-        if urdf_path is None:
-            id_str = f"{namespace}_{tree_type}_{tree_id}"
-        else:
-            id_str = Path(urdf_path).stem
-            id_str_components = id_str.split("_")
-            self.tree_namespace = id_str_components[0]
-            self.tree_type = id_str_components[1]
-            self.tree_id = str(id_str_components[2]).zfill(5)
-        return id_str
 
     def load_tree_urdf(
         self,
@@ -178,9 +150,7 @@ class Tree:
             None
         """
         if not os.path.exists(self.urdf_path):
-            log.info(
-                f"Could not find file '{self.urdf_path}'. Generating URDF from xacro."
-            )
+            log.info(f"Could not find file '{self.urdf_path}'. Generating URDF from xacro.")
 
             if not os.path.isdir(Tree._tree_generated_urdf_path):
                 os.mkdir(Tree._tree_generated_urdf_path)
@@ -197,13 +167,9 @@ class Tree:
                 xacro_path=Tree._tree_xacro_path, mappings=urdf_mappings
             ).toprettyxml()
             if save_urdf:
-                xutils.save_urdf(
-                    urdf_content=urdf_content, urdf_path=self.urdf_path
-                )
+                xutils.save_urdf(urdf_content=urdf_content, urdf_path=self.urdf_path)
         else:
-            urdf_content = xutils.load_urdf_from_xacro(
-                xacro_path=self.urdf_path
-            ).toprettyxml()
+            urdf_content = xutils.load_urdf_from_xacro(xacro_path=self.urdf_path).toprettyxml()
             log.info(f"Loaded URDF from file '{self.urdf_path}'.")
 
         return urdf_content
@@ -217,32 +183,19 @@ class Tree:
         )
         return new_position, new_orientation
 
-    def transform_tree_obj_vertex(
-        self, vertex: ArrayLike
-    ) -> Tuple[np.ndarray, float]:
+    def transform_tree_obj_vertex(self, vertex: ArrayLike) -> tuple[np.ndarray, float]:
         """
         Transform a vertex from the tree object to the world frame.
         """
         vertex_pos = np.array(vertex[0:3]) * self.scale
         vertex_orientation = [0, 0, 0, 1]  # Dont care about orientation
 
-        vertex_w_transform: Tuple[tuple, tuple] = (
-            self.pbclient.multiplyTransforms(
-                self.pos, self.orientation, vertex_pos, vertex_orientation
-            )
+        vertex_w_transform: tuple[tuple, tuple] = self.pbclient.multiplyTransforms(
+            self.pos, self.orientation, vertex_pos, vertex_orientation
         )
         # vertex_w_transform = np.concatenate((final_position, final_orientation))
 
         return (np.array(vertex_w_transform[0]), vertex[3])
-
-    def convert_tree_ply_to_obj(self) -> None:
-        """Loads a mesh .obj mesh file with its path defined by the tree_id_str"""
-        if not os.path.exists(self.ply_mesh_path):
-            raise TreeException(f"Could not find file '{self.ply_mesh_path}.")
-        tm = tmr.RenderScene.load_mesh(mesh_path=self.ply_mesh_path)
-        ctm = tmr.RenderScene.recolor_mesh(mesh=tm)
-        ctm.export(self.obj_mesh_path, file_type="obj")
-        return
 
 
 def main():
@@ -250,11 +203,12 @@ def main():
 
     from pybullet_tree_sim.utils.pyb_utils import PyBUtils
 
-    pbutils = PyBUtils(renders=True)
+    pbutils = PyBUtils(renders=False)
 
     tree = Tree(
         pbutils=pbutils,
-        tree_id=64,
+        meshes_root="/home/luke/dev/pybullet/pybullet-tree-sim/pybullet_tree_sim/meshes",
+        tree_id=1,
         tree_type="envy",
         namespace="LPy",
     )

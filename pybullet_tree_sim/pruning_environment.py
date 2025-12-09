@@ -53,12 +53,8 @@ class PruningEnv(gym.Env):
     The environment is used to train a reinforcement learning agent to prune the tree.
     """
 
-    _supports_and_post_xacro_path = os.path.join(
-        URDF_PATH, "supports_and_post", "supports_and_post.urdf.xacro"
-    )
-    _supports_and_post_urdf_path = os.path.join(
-        URDF_PATH, "supports_and_post", "supports_and_post.urdf"
-    )
+    _supports_and_post_xacro_path = os.path.join(URDF_PATH, "supports_and_post", "supports_and_post.urdf.xacro")
+    _supports_and_post_urdf_path = os.path.join(URDF_PATH, "supports_and_post", "supports_and_post.urdf")
     _shapes_xacro_dir = os.path.join(URDF_PATH, "shapes")
 
     def __init__(
@@ -166,22 +162,16 @@ class PruningEnv(gym.Env):
         if tree:
             if self.verbose:
                 log.info("Activating tree")
-            tree.pyb_id = self.pbutils.pbclient.loadURDF(
-                tree.urdf_path, useFixedBase=True
-            )
+            tree.pyb_id = self.pbutils.pbclient.loadURDF(tree.urdf_path, useFixedBase=True)
             log.info(f"Tree {tree.id_str} activated with PyBID {tree.pyb_id}")
 
             if include_support_posts:
                 self.activate_support_posts(associated_tree=tree)
         return
 
-    def activate_tree_by_id_str(
-        self, tree_id_str: str, include_support_posts: bool = True
-    ) -> None:
+    def activate_tree_by_id_str(self, tree_id_str: str, include_support_posts: bool = True) -> None:
         tree = self.get_tree_from_id_str(tree_id_str=tree_id_str)
-        self.activate_tree(
-            tree=tree, include_support_posts=include_support_posts
-        )
+        self.activate_tree(tree=tree, include_support_posts=include_support_posts)
         return
 
     def deactivate_tree(self, tree: Tree) -> None:
@@ -212,9 +202,7 @@ class PruningEnv(gym.Env):
                 0.0,
             ]
         if orientation is None:
-            orientation = Rotation.from_euler(
-                "xyz", [np.pi / 2, 0, np.pi / 2]
-            ).as_quat()
+            orientation = Rotation.from_euler("xyz", [np.pi / 2, 0, np.pi / 2]).as_quat()
 
         if not os.path.exists(
             self._supports_and_post_urdf_path
@@ -237,11 +225,11 @@ class PruningEnv(gym.Env):
         return
 
     def deactivate_support_posts(self) -> None:
-        # try:
-        #     self.pbutils.pbclient.removeBody(self.collision_object_ids["SUPPORT"])
-        #     log.info(f"Supports and post deactivated")
-        # except Exception as e:
-        #     log.error(f"Error deactivating supports and post: {e}")
+        try:
+            self.pbutils.pbclient.removeBody(self.collision_object_ids["SUPPORT"])
+            log.info(f"Supports and post deactivated")
+        except Exception as e:
+            log.error(f"Error deactivating supports and post: {e}")
         return
 
     def reset_environment(self) -> None:
@@ -265,12 +253,8 @@ class PruningEnv(gym.Env):
         """
         # log.warning(locals())
         shape = shape.strip().lower()
-        shape_xacro_path = os.path.join(
-            self._shapes_xacro_dir, shape, f"{shape}.urdf.xacro"
-        )
-        shape_urdf_path = os.path.join(
-            self._shapes_xacro_dir, shape, f"{shape}.urdf"
-        )
+        shape_xacro_path = os.path.join(self._shapes_xacro_dir, shape, f"{shape}.urdf.xacro")
+        shape_urdf_path = os.path.join(self._shapes_xacro_dir, shape, f"{shape}.urdf")
 
         shape_mappings = {}
         for key, value in kwargs.items():
@@ -290,9 +274,7 @@ class PruningEnv(gym.Env):
         #     radius = kwargs.get('radius')
         #     height = kwargs.get('height')
 
-        urdf_content = xutils.load_urdf_from_xacro(
-            xacro_path=shape_xacro_path, mappings=shape_mappings
-        ).toprettyxml()
+        urdf_content = xutils.load_urdf_from_xacro(xacro_path=shape_xacro_path, mappings=shape_mappings).toprettyxml()
         xutils.save_urdf(urdf_content=urdf_content, urdf_path=shape_urdf_path)
 
         shape_id = self.pbutils.pbclient.loadURDF(
@@ -304,9 +286,7 @@ class PruningEnv(gym.Env):
 
         return
 
-    def is_reachable(
-        self, robot: Robot, vertex: Tuple[np.ndarray], base_xyz: np.ndarray
-    ) -> bool:
+    def is_reachable(self, robot: Robot, vertex: Tuple[np.ndarray], base_xyz: np.ndarray) -> bool:
         # if vertex[3] != "SPUR":
         #     return False
         ur5_base_pos = np.array(base_xyz)
@@ -314,9 +294,7 @@ class PruningEnv(gym.Env):
         # Meta condition
         dist = np.linalg.norm(ur5_base_pos - vertex[0], axis=-1)
 
-        if (
-            dist >= 0.98
-        ):  # TODO: is this for the UR5? Should it be from a parameter file?
+        if dist >= 0.98:  # TODO: is this for the UR5? Should it be from a parameter file?
             return False
 
         j_angles = robot.calculate_ik(vertex[0], None)
@@ -379,16 +357,12 @@ def main():
     ).T
     depth_data[-1, 3] = 0.31
     # Switch to F-format
-    depth_data = depth_data.reshape(
-        (tof0.depth_width * tof0.depth_height, 1), order="F"
-    )
+    depth_data = depth_data.reshape((tof0.depth_width * tof0.depth_height, 1), order="F")
 
     view_matrix = np.identity(4)
     view_matrix[:3, 3] = -1 * np.array([0, 0, 1])
 
-    world_points = robot.deproject_pixels_to_points(
-        camera=tof0, data=depth_data, view_matrix=view_matrix, debug=True
-    )
+    world_points = robot.deproject_pixels_to_points(camera=tof0, data=depth_data, view_matrix=view_matrix, debug=True)
 
     # log.warning(f"joint angles: {penv.ur5.get_joint_angles()}")
 

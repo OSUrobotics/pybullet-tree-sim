@@ -14,6 +14,19 @@ class TimeOfFlight(DepthSensor):
         """Builds a ToF camera object from a base Camera class"""
         super().__init__(sensor_type=sensor_type, *args, **kwargs)
 
+        # TODO: move to base Sensor class?
+        base_offset = self.params["depth"]["sensing_unit_offset"]
+        self.base__sensing_unit_xyz_offset = (
+            base_offset["x"],  # x
+            base_offset["y"],  # y
+            base_offset["z"],  # z
+        )
+        self.base__sensing_unit_rpy_offset = (
+            base_offset["roll"],  # r
+            base_offset["pitch"],  # p
+            base_offset["yaw"],  # y
+        )
+
         return
 
 

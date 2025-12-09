@@ -172,6 +172,7 @@ pkl/
 
 meshes*/
 **/test.urdf
+*.urdf
 
 *.stl
 *.mtl
