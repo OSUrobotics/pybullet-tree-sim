@@ -160,87 +160,99 @@ class TreeMetadata:
 
         # Basic mesh data
         verts = np.asarray(original_mesh.vertices)  # (V,3)
-        face_idx = np.asarray(original_mesh.faces, dtype=np.int64)  # (F,3)
-        face_centroids = np.mean(verts[face_idx], axis=1)  # (F,3)
+        faces_vertex_indices = np.asarray(original_mesh.faces, dtype=np.int64)  # (F,3)
+        face_centroids = np.mean(verts[faces_vertex_indices], axis=1)  # (F,3)
         face_normals = np.asarray(original_mesh.face_normals)  # (F,3)
 
         # Face colors
-        original_face_colors = np.asarray(original_mesh.visual.face_colors).astype(np.int16)  # (F,4)
-        recolored_face_colors = np.asarray(recolored_mesh.visual.face_colors).astype(np.int16)  # (F,4)
-        
+        original_face_rgb = np.asarray(original_mesh.visual.face_colors).astype(np.int16)  # (F,4)
+        recolored_face_rgb = np.asarray(recolored_mesh.visual.face_colors).astype(np.int16)  # (F,4)
+
         # Pack RGB into uint32 for fast comparison: R<<16 | G<<8 | B
-        face_packed = (
-            (original_face_colors[:, 0].astype(np.uint32) << 16)
-            | (original_face_colors[:, 1].astype(np.uint32) << 8)
-            | original_face_colors[:, 2].astype(np.uint32)
+        original_face_rgb_packed = (
+            (original_face_rgb[:, 0].astype(np.uint32) << 16)
+            | (original_face_rgb[:, 1].astype(np.uint32) << 8)
+            | original_face_rgb[:, 2].astype(np.uint32)
         )
 
-        print(face_packed)
+        # Precompute cylinder arrays
+        cyl_rgb_packed = np.empty(shape=(len(self.cylinders),), dtype=np.uint32)
+        cyl_centroids = np.empty(shape=(len(self.cylinders), 3), dtype=np.float32)
+        cyl_ref_x = np.empty(shape=(len(self.cylinders), 3), dtype=np.float32)
+        cyl_ref_y = np.empty(shape=(len(self.cylinders), 3), dtype=np.float32)
+        cyl_ref_z = np.empty(shape=(len(self.cylinders), 3), dtype=np.float32)
+        cyl_lengths = np.empty(shape=(len(self.cylinders),), dtype=np.float32)
+        cyl_ids = np.empty(shape=(len(self.cylinders),), dtype=np.int32)
 
-        import sys
+        world_x = np.array([1.0, 0.0, 0.0])
+        world_y = np.array([0.0, 1.0, 0.0])
+        for i, cyl in enumerate(self.cylinders):
+            r, g, b = cyl.color
+            packed = (np.uint32(r) << 16) | (np.uint32(g) << 8) | np.uint32(b)
+            cyl_rgb_packed[i] = packed
 
-        sys.exit(0)
-
-        # Iterate over mesh faces
-        for face_idx in range(len(original_mesh.faces)):
-            vertex_indices = original_mesh.faces[face_idx]
-            vertices = [tuple(original_mesh.vertices[idx]) for idx in vertex_indices]
-            normal = tuple(original_mesh.face_normals[face_idx])
-
-            original_color = tuple(original_mesh.visual.face_colors[face_idx][:3])  # RGB only
-            recolored_color = tuple(recolored_mesh.visual.face_colors[face_idx][:3])  # RGB only
-            # print(original_color, recolored_color)
-            cylinder_part = self.color_map.get(original_color, None)
-            if cylinder_part is None:
-                # Check cylinder metadata to confirm it's a pruned part
-                check_cyl = self.raw_metadata["cylinder_data"].get(str(original_color), None)
-                if check_cyl is None:
-                    log.warning(f"Original face color {original_color} not found in cylinder color map.")
-                else:
-                    pass
-                    # log.debug(f"Original face color {original_color} corresponds to a pruned cylinder part.")
+            cyl_centroids[i] = np.asarray(cyl.centroid, dtype=float)
+            cyl_z = np.asarray(cyl.orientation, dtype=float)
+            cyl_ref_z[i] = cyl_z 
+            # project world_x onto plane perpendicular to axis
+            cyl_x = world_x - np.dot(world_x, cyl_z) * cyl_z
+            cyl_x /= np.linalg.norm(cyl_x)
+            cyl_ref_x[i] = cyl_x
+            cyl_y = np.cross(cyl_z, cyl_x)
+            cyl_ref_y[i] = cyl_y
+            cyl_lengths[i] = cyl.length
+            cyl_ids[i] = cyl.cylinder_id
+            # assert np.isclose(np.dot(cyl_x, cyl_z), 0.0, atol=1e-9), "Projected vector is not perpendicular to axis"
+        
+        # For each cylinder, find matching face indices by color, compute theta and t_val
+        for i, cyl_rgb in enumerate(cyl_rgb_packed):
+            matching_face_indices = np.where(original_face_rgb_packed == cyl_rgb)[0]
+            if matching_face_indices.size == 0:
                 continue
+            cyl_centroid = cyl_centroids[i]
+            cyl_x = cyl_ref_x[i]
+            cyl_y = cyl_ref_y[i]
+            cyl_z = cyl_ref_z[i]
+            cyl_length = cyl_lengths[i]
+            cyl_id = cyl_ids[i]
 
-            cylinder_part_name = cylinder_part.limb_name
-            cylinder_part_id = cylinder_part.limb_id
+            # Vector from cylinder centroid to face centroids
+            vec_centroid_to_face = face_centroids[matching_face_indices] - cyl_centroid
 
-            # Compute theta and t_val. Theta is the angle around the cylinder axis, t_val is the normalized height along the cylinder. We assume the cylinder axis is aligned with the z-axis for simplicity.
-            face_center = np.mean(vertices, axis=0)
-            t_val = (face_center[2] - cylinder_part.centroid[2]) / cylinder_part.length
+            # Axial coordinate (projection onto cylinder axis)
+            axial_coords = np.dot(vec_centroid_to_face, cyl_z)
+            t_vals = axial_coords / cyl_length
 
-            # Get the phi angle which includes the centroid and orientation of the cylinder
+            # Radial vectors (projected onto plane perpendicular to cylinder axis)
+            radial_vecs = vec_centroid_to_face - np.outer(axial_coords, cyl_z)
+            radial_vecs_norm = np.linalg.norm(radial_vecs, axis=1, keepdims=True)
+            radial_vecs_normalized = radial_vecs / radial_vecs_norm
+            proj_x = np.dot(radial_vecs_normalized, cyl_x)
+            proj_y = np.dot(radial_vecs_normalized, cyl_y)
+            thetas = np.arctan2(proj_y, proj_x)
 
-            x_axis = np.array([1, 0, 0])
-            z_axis = np.array([0, 0, 1])
-            rot_axis = np.cross(z_axis, cylinder_part.orientation)
-            rot_axis_norm = np.linalg.norm(rot_axis)
-            if rot_axis_norm != 0:
-                rot_axis = rot_axis / rot_axis_norm
-                phi = np.arccos(np.dot(z_axis, cylinder_part.orientation))  # Angle between z-axis and cylinder
-            else:
-                phi = 0.0
-            rot = R.from_rotvec(rot_axis * phi)
-            rotated_x = rot.apply(x_axis)
-            # find angle between rotated_x and face normal
-            theta = np.arccos(np.dot(rotated_x, normal) / (np.linalg.norm(rotated_x) * np.linalg.norm(normal)))
-            if np.isnan(theta):
-                theta = 0.0
+            # normals and recolored colors
+            matched_normals = face_normals[matching_face_indices]
+            matched_recolors = recolored_face_rgb[matching_face_indices]
 
-            face = Face(
-                vertices=vertices,
-                normal=normal,
-                color=recolored_color,
-                face_id=face_id_counter,
-                face_id_a=original_mesh.faces[face_idx],
-                theta=theta,
-                t_val=t_val,
-                cylinder_id=cylinder_part_id,
-            )
-            faces.append(face)
-            face_id_counter += 1
-            self.faces = faces
+            # Create Face objects
+            for j, face_idx in enumerate(matching_face_indices):
+                vertex_indices_for_face = faces_vertex_indices[face_idx]
+                face_vertices = [tuple(original_mesh.vertices[idx]) for idx in vertex_indices_for_face]
+                face = Face(
+                    vertices=face_vertices,
+                    normal=tuple(matched_normals[j]),
+                    color=tuple(matched_recolors[j][:3]),
+                    face_id=face_id_counter,
+                    face_id_a=original_mesh.faces[face_idx].tolist(),
+                    theta=thetas[j],
+                    t_val=t_vals[j],
+                    cylinder_id=cyl_id,
+                )
+                faces.append(face)
+                face_id_counter += 1
+            
         return faces
-
 
 def main():
     # tree_meta = TreeMetadata(namespace="lpy", tree_id=0, tree_type="Envy")

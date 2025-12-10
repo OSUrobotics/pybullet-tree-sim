@@ -108,15 +108,7 @@ class Tree:
         self.recolored_mesh = MeshObjects.color_and_convert_ply_to_obj(
             ply_mesh_path=self.ply_mesh_path, obj_mesh_path=self.obj_mesh_path
         )
-        import time
-
-        start_time = time.process_time()
         self.faces = tree_metadata.get_faces(original_mesh=self.raw_mesh, recolored_mesh=self.recolored_mesh)
-        print(f"time: {time.process_time() - start_time}")
-        print(self.faces[64])
-        import sys
-
-        sys.exit(0)
 
         # URDF
         self.load_tree_urdf(scale=scale, parent=parent)
