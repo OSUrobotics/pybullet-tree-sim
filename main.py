@@ -11,13 +11,17 @@ from pybullet_tree_sim.utils.rgb_stream_visualizer import RGBStreamVisualizer
 import numpy as np
 import secrets
 import time
-from zenlog import log
 
 from scipy.spatial.transform import Rotation
 
 import pprint as pp
 
 from PIL import Image
+
+import logging
+import pybullet_tree_sim.utils.logging_conf
+
+logger = logging.getLogger(__name__)
 
 
 def main():
@@ -73,12 +77,9 @@ def main():
     pyr_scene.add_camera(camera=robot.sensors["tof0"], pose=camera_pose, mode="depth", camera_name="tof0")
     # pyr_scene.render_visual()
 
-    rgb_viz = RGBStreamVisualizer(max_queue_size=5)
-    rgb_viz.start()
-    time.sleep(1)
-
     while True:
         try:
+            logger.debug("Simulation step")
             # log.debug(f"{robot.sensors['tof0']}")
             tof0_view_matrix = robot.get_view_mat_at_curr_pose(camera=robot.sensors["tof0"])
             tof0_rgbd = robot.get_rgbd_at_cur_pose(
@@ -90,22 +91,6 @@ def main():
             camera_pose = np.linalg.inv(camera_extrinsics)
             pyr_scene.update_camera_pose(camera_name="tof0", pose=camera_pose)
             color, depth = pyr_scene.render_optical_sensor(sensor=robot.sensors["tof0"])
-
-            # print("COLOR:")
-            # print(pp.pformat(color))
-            # print("DEPTH:")
-            # print(pp.pformat(depth))
-
-            rgb_viz.update_frame(rgb_data=color)
-
-            # tof1_view_matrix = robot.get_view_mat_at_curr_pose(camera=robot.sensors["tof1"])
-            # tof1_rgbd = robot.get_rgbd_at_cur_pose(
-            #     camera=robot.sensors["tof1"],
-            #     type="sensor",
-            #     view_matrix=tof1_view_matrix,
-            # )
-            # tof0_view_matrix = np.asarray(tof0_view_matrix).reshape((4, 4), order="F")
-            # log.debug(f"{tof0_view_matrix[:3, 3]}")
 
             # Get user keyboard input, map to robot movement, camera capture, controller action
             keys_pressed = penv.get_key_pressed()
@@ -119,9 +104,9 @@ def main():
 
             # Step simulation
             pbutils.pbclient.stepSimulation()
-            time.sleep(0.001)
+            time.sleep(0.01)
         except KeyboardInterrupt:
-            rgb_viz.stop()
+            # rgb_viz.stop()
             break
 
     # # penv.deactivate_tree(tree_id_str="LPy_tree1")

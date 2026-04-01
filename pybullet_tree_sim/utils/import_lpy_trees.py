@@ -3,6 +3,7 @@ import glob
 import os
 import shutil
 import json
+import argparse
 
 from pybullet_tree_sim import MESHES_PATH
 
@@ -31,39 +32,6 @@ def get_metadata_files_in_directory(directory: str) -> list[str]:
     return metadata_files
 
 
-def get_tree_hierarchy_files_in_directory(directory: str) -> list[str]:
-    """Get all tree hierarchy JSON files in a given directory.
-
-    :param directory: Directory path
-    :type directory: str
-    :return: List of tree hierarchy JSON file paths
-    :rtype: list[str]
-    """
-    hierarchy_files = glob.glob(os.path.join(directory, "**/*_hierarchy.json"), recursive=True)
-    return hierarchy_files
-
-
-def merge_hierarchy_with_metadata(hierarchy_path: str, metadata_path: str) -> dict:
-    """Merge tree hierarchy JSON with metadata JSON.
-
-    :param hierarchy_path: Path to tree hierarchy JSON file
-    :type hierarchy_path: str
-    :param metadata_path: Path to metadata JSON file
-    :type metadata_path: str
-    """
-    with open(hierarchy_path, "r") as f:
-        hierarchy_data = json.load(f)
-    with open(metadata_path, "r") as f:
-        cylinder_metadata = json.load(f)
-
-    metadata = {
-        "cylinder_data": cylinder_metadata,
-        "hierarchy": hierarchy_data,
-    }
-
-    return metadata
-
-
 def sanitize_file_name(filename: str) -> str:
     """Sanitize a filename by replacing spaces with underscores and converting to lowercase.
 
@@ -76,7 +44,7 @@ def sanitize_file_name(filename: str) -> str:
     return sanitized
 
 
-def move_ply_to_trees_dir(source_path: str, dest_directory: str) -> str:
+def copy_to_dir(source_path: str, dest_directory: str, overwrite: bool = False) -> str:
     """Move a .ply file to the specified trees directory.
 
     :param source_path: Source .ply file path
@@ -91,33 +59,34 @@ def move_ply_to_trees_dir(source_path: str, dest_directory: str) -> str:
     filename = os.path.basename(source_path)
     filename = sanitize_file_name(filename)
     dest_path = os.path.join(dest_directory, filename)
+
+    if os.path.exists(dest_path) and not overwrite:
+        raise FileExistsError("File already exists.")
     shutil.copy(source_path, dest_path)
     return dest_path
 
 
 def main():
+    parser = argparse.ArgumentParser(description="Import LPy tree .ply and metadata files into pybullet_tree_sim.")
+    parser.add_argument("--overwrite", action="store_true", help="Overwrite existing files.")
+    args = parser.parse_args()
+
     dataset_dir = os.path.expanduser("~/dev/lpy_treesim/dataset")
     ply_files = get_ply_files_in_directory(dataset_dir)
     metadata_files = get_metadata_files_in_directory(dataset_dir)
-    hierarchy_files = get_tree_hierarchy_files_in_directory(dataset_dir)
 
     output_ply_dir = os.path.join(MESHES_PATH, "trees", "ply")
+    if not os.path.exists(output_ply_dir):
+        os.makedirs(output_ply_dir)
     output_metadata_dir = os.path.join(MESHES_PATH, "trees", "metadata")
+    if not os.path.exists(output_metadata_dir):
+        os.makedirs(output_metadata_dir)
 
-    for hierarchy_file in sorted(hierarchy_files):
-        base_name = os.path.basename(hierarchy_file).replace("_hierarchy.json", "")
-        tree_type = base_name.split("_")[1].lower()
-        corresponding_metadata_file = os.path.join(dataset_dir, tree_type, base_name + "_metadata.json")
-        if os.path.exists(corresponding_metadata_file):
-            merged_metadata = merge_hierarchy_with_metadata(hierarchy_file, corresponding_metadata_file)
-            if not os.path.exists(output_metadata_dir):
-                os.makedirs(output_metadata_dir)
-            output_metadata_path = os.path.join(output_metadata_dir, sanitize_file_name(base_name + "_metadata.json"))
-            with open(output_metadata_path, "w") as f:
-                json.dump(merged_metadata, f, indent=4)
+    for m_file in sorted(metadata_files):
+        dest_path = copy_to_dir(source_path=m_file, dest_directory=output_metadata_dir, overwrite=args.overwrite)
 
     for ply_file in ply_files:
-        move_ply_to_trees_dir(ply_file, output_ply_dir)
+        dest_path = copy_to_dir(source_path=ply_file, dest_directory=output_ply_dir, overwrite=args.overwrite)
 
     return
 

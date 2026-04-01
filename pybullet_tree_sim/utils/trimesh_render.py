@@ -3,12 +3,18 @@
 from pybullet_tree_sim import MESHES_PATH
 from pybullet_tree_sim.utils.mesh_objects import MeshObjects
 from pybullet_tree_sim.sensors.optical_sensor import OpticalSensor
+from pybullet_tree_sim.sensors.sensor_types import SensorType, DataType
+from pybullet_tree_sim.sensors.lidar import Lidar
 import trimesh
 import pyrender
 import numpy as np
 import os
 
-import open3d as o3d
+import logging
+import pybullet_tree_sim.utils.logging_conf
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 
 class RenderScene:
@@ -27,56 +33,58 @@ class RenderScene:
         # Active camera nodes
         self.sensor_nodes = {}
 
-        # Renderer
-        self.renderer = None
         return
 
-    def add_camera(
+    def add_optical_sensor(
         self,
-        camera: OpticalSensor,
+        optical_sensor: OpticalSensor,
         pose: np.ndarray,
-        camera_name: str,
-        mode: str = "rgb",
+        sensor_name: str,
     ) -> None:
         """Add a camera to the PyRender scene
         https://pyrender.readthedocs.io/en/latest/generated/pyrender.camera.IntrinsicsCamera.html#pyrender.camera.IntrinsicsCamera
 
-        :param camera: An object derived from base class OpticalSensor. Options include DepthSensor, RGBCamera, DepthCamera
-        :type camera: OpticalSensor
+        :param optical_sensor: An object derived from base class OpticalSensor. Options include DepthSensor, RGBCamera, DepthCamera
+        :type optical_sensor: OpticalSensor
         :param pose: A matrix describing the camera pose to world, RT
         :type pose: np.ndarray
-        :param camera_name: Name of the camera. Needed for adding/deleting cameras from the scene
-        :type camera_name: str
+        :param sensor_name: Name of the sensor. Needed for adding/deleting sensors from the scene
+        :type sensor_name: str
         """
         # TODO: change this to accommodate depth, rgb, rgbd
-        camera_intrinsics = camera.get_camera_intrinsics()[mode]
+        for mode in optical_sensor.modalities:
+            sensor_intrinsics = optical_sensor.get_optical_intrinsics()[mode]
+            # logger.debug(sensor_intrinsics)
 
-        pyr_camera = pyrender.IntrinsicsCamera(
-            fx=camera_intrinsics["fx"],
-            fy=camera_intrinsics["fy"],
-            cx=camera_intrinsics["cx"],
-            cy=camera_intrinsics["cy"],
-            znear=camera_intrinsics["znear"],
-            zfar=camera_intrinsics["zfar"],
-            name=camera.sensor_name,
-        )
+            pyr_camera = pyrender.IntrinsicsCamera(
+                fx=sensor_intrinsics["fx"],
+                fy=sensor_intrinsics["fy"],
+                cx=sensor_intrinsics["cx"],
+                cy=sensor_intrinsics["cy"],
+                znear=sensor_intrinsics["znear"],
+                zfar=sensor_intrinsics["zfar"],
+                name=optical_sensor.sensor_name,
+            )
 
-        camera_node = self.scene.add(pyr_camera, pose=pose)
-        self.sensor_nodes[camera_name] = camera_node
+            sensor_node = self.scene.add(pyr_camera, pose=pose)
+            self.sensor_nodes[f"{sensor_name}_{mode}"] = sensor_node
 
         return
 
-    def remove_camera(self, camera_name: str) -> None:
-        """Remove a camera from the PyRender scene"""
-        if camera_name in self.sensor_nodes:
-            self.scene.remove_node(self.sensor_nodes[camera_name])
-            del self.sensor_nodes[camera_name]
+    def remove_sensor(self, sensor_name: str) -> None:
+        """Remove a sensor from the PyRender scene"""
+        if sensor_name in self.sensor_nodes:
+            self.scene.remove_node(self.sensor_nodes[sensor_name])
+            del self.sensor_nodes[sensor_name]
         return
 
-    def update_camera_pose(self, camera_name: str, pose: np.ndarray) -> None:
-        """Update the pose of an existing camera"""
-        if camera_name in self.sensor_nodes:
-            self.scene.set_pose(self.sensor_nodes[camera_name], pose=pose)
+    def update_sensor_pose(self, sensor: OpticalSensor, pose: np.ndarray) -> None:
+        """Update the pose of an existing sensor"""
+        sensor_name = sensor.sensor_name
+        for mode in sensor.modalities:
+            full_sensor_name = f"{sensor_name}_{mode}"
+            if full_sensor_name in self.sensor_nodes:
+                self.scene.set_pose(node=self.sensor_nodes[full_sensor_name], pose=pose)
         return
 
     def render_visual(self) -> None:
@@ -84,26 +92,38 @@ class RenderScene:
         pyrender.Viewer(self.scene)
         return
 
-    def render_optical_sensor(self, sensor: OpticalSensor) -> None:
-        if sensor.sensor_name not in self.sensor_nodes:
-            raise ValueError(f"Camera '{sensor.sensor_name}' not found in scene.")
+    def render_optical_sensor(self, sensor: OpticalSensor) -> dict:
+        """Render the scene from the perspective of the given optical sensor"""
+        data = {}
+        for mode in sensor.modalities:
+            sensor_node = self.sensor_nodes[f"{sensor.sensor_name}_{mode}"]
+            sensor_intrinsics = sensor.get_optical_intrinsics()[mode]
 
-        self.renderer = pyrender.OffscreenRenderer(
-            viewport_width=sensor.depth_width, viewport_height=sensor.depth_height
-        )
-        color, depth = self.renderer.render(
-            scene=self.scene, flags=pyrender.RenderFlags.FLAT | pyrender.RenderFlags.SKIP_CULL_FACES
-        )
-        return color, depth
+            renderer = pyrender.OffscreenRenderer(
+                viewport_width=sensor.depth_width, viewport_height=sensor.depth_height
+            )
+            rgb, depth = renderer.render(
+                scene=self.scene, flags=pyrender.RenderFlags.FLAT | pyrender.RenderFlags.SKIP_CULL_FACES
+            )
+            data[mode] = {
+                "rgb": rgb,
+                "depth": depth,
+            }
+        return data
 
-    def render_lidar_scan(self, mesh, lidar_sensor, extrinsics):
+    def render_lidar_scan(self, mesh: trimesh.Trimesh, lidar_sensor: Lidar, extrinsics: np.ndarray) -> np.ndarray:
         """
         Cast rays for lidar simulation.
 
-        Returns:
-        --------
-        points : np.ndarray (N, 3)
-            Point cloud in world coordinates
+        :param mesh: Trimesh scene to raycast against.
+        :type mesh: trimesh.Trimesh
+        :param lidar_sensor: Sensor providing scan pattern and intrinsics.
+        :type lidar_sensor: Lidar
+        :param extrinsics: 4x4 transform from sensor to world (pose).
+        :type extrinsics: np.ndarray
+
+        :returns: Point cloud in world coordinates.
+        :rtype: np.ndarray (N, 3)
         """
         azimuths, elevations = lidar_sensor.get_scan_pattern()
 
@@ -133,9 +153,9 @@ class RenderScene:
 
     def cleanup(self) -> None:
         """Clean up renderer resources"""
-        if self.renderer is not None:
-            self.renderer.delete()
-            self.renderer = None
+        # if self.renderer is not None:
+        #     self.renderer.delete()
+        #     self.renderer = None
 
         return
 

@@ -11,7 +11,11 @@ from trimesh import Trimesh
 
 import msgspec
 
-from zenlog import log
+import logging
+import pybullet_tree_sim.utils.logging_conf
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 # from pybullet_tree_sim.tree import Tree
 
@@ -28,6 +32,7 @@ class Cylinder(msgspec.Struct):
     radius: float
     length: float
     orientation: tuple[float, float, float]
+    rot_mat: np.ndarray
 
 
 class Face(msgspec.Struct):
@@ -51,6 +56,8 @@ class Limb(msgspec.Struct):
     limb_id: int
     cylinders: list[str]
     children: list[str] = None
+    start_point: tuple[float, float, float] = None
+    end_point: tuple[float, float, float] = None
 
     def get_by_id(self, limb_id: int) -> Cylinder | None:
         for c in self.cylinders:
@@ -62,7 +69,12 @@ class Limb(msgspec.Struct):
 @dataclass
 class TreeMetadata:
     def __init__(
-        self, namespace: str, tree_id: int, tree_type: str, tree_metadata_path: str, tree_mesh: Trimesh
+        self,
+        namespace: str,
+        tree_id: int,
+        tree_type: str,
+        tree_metadata_path: str,
+        # tree_mesh: Trimesh
     ) -> None:
 
         self.namespace = namespace
@@ -116,12 +128,25 @@ class TreeMetadata:
         cylinders: list[Cylinder] = []
         cylinder_id_counter = 0
         for limb_name, cyl_data_list in metadata["hierarchy"].items():
-
+            try:
+                limb_start_point = tuple(metadata["branch_locations"][limb_name]["start"])
+                limb_end_point = tuple(metadata["branch_locations"][limb_name]["end"])
+            except KeyError:
+                continue
             limb_cylinders = []
             # iterate over cyl_data_list and create Cylinder objects by finding matching entries in metadata['cylinder_data']
+            prev_cyl_ori = None
             for cylinder_color_str, cylinder_data in metadata["cylinder_data"].items():
                 try:
                     if cylinder_data["part_name"].lower() == limb_name.lower():
+                        if prev_cyl_ori is None:
+                            prev_cyl_ori = np.array(limb_end_point) - np.array(limb_start_point)
+                            prev_cyl_ori /= np.linalg.norm(prev_cyl_ori)
+
+                        cylinder_data["rot_mat"] = self._compute_cylinder_rotation_matrix(
+                            orientation=np.array(cylinder_data["orientation"]), prev_cyl_ori=prev_cyl_ori
+                        )
+
                         cyl_obj = Cylinder(
                             limb_name=limb_name,
                             limb_id=limb_id_counter,
@@ -131,9 +156,12 @@ class TreeMetadata:
                             radius=cylinder_data["radius"],
                             length=cylinder_data["length"],
                             orientation=tuple(cylinder_data["orientation"]),
+                            rot_mat=cylinder_data["rot_mat"],
                         )
                         cylinder_id_counter += 1
                         limb_cylinders.append(cyl_obj)
+
+                        prev_cyl_ori = np.array(cylinder_data["orientation"])
                 except KeyError:
                     # log.debug(f"Limb '{limb_name}' was pruned.")
                     continue
@@ -141,17 +169,33 @@ class TreeMetadata:
             cylinders.extend(limb_cylinders)
 
             limbs[limb_name] = Limb(
-                name=limb_name, limb_id=limb_id_counter, children=cyl_data_list, cylinders=limb_cylinders
+                name=limb_name,
+                limb_id=limb_id_counter,
+                children=cyl_data_list,
+                cylinders=limb_cylinders,
+                start_point=limb_start_point,
+                end_point=limb_end_point,
             )
             limb_id_counter += 1
 
         return limbs, cylinders
 
+    def _compute_cylinder_rotation_matrix(self, orientation: list[float], prev_cyl_ori) -> np.ndarray:
+        if np.dot(orientation, prev_cyl_ori) < 0:
+            orientation = -np.array(orientation)
+        world_z = np.array([0, 0, 1])
+        rot_axis = np.cross(world_z, orientation)
+        rot_axis /= np.linalg.norm(rot_axis)
+        rot_mag = np.arccos(np.dot(world_z, orientation) / (np.linalg.norm(world_z) * np.linalg.norm(orientation)))
+        rot_vec = rot_axis * rot_mag
+        rot = R.from_rotvec(rot_vec)
+        rot_mat = rot.as_matrix()
+        return rot_mat
+
     def get_color_to_cylinder_map(self) -> dict[tuple[int, int, int], Cylinder]:
         color_map: dict[tuple[int, int, int], Cylinder] = {}
         for cylinder in self.cylinders:
             color_map[cylinder.color] = cylinder
-
         return color_map
 
     def get_faces(self, original_mesh: Trimesh, recolored_mesh: Trimesh) -> list[Face]:
@@ -193,7 +237,7 @@ class TreeMetadata:
 
             cyl_centroids[i] = np.asarray(cyl.centroid, dtype=float)
             cyl_z = np.asarray(cyl.orientation, dtype=float)
-            cyl_ref_z[i] = cyl_z 
+            cyl_ref_z[i] = cyl_z
             # project world_x onto plane perpendicular to axis
             cyl_x = world_x - np.dot(world_x, cyl_z) * cyl_z
             cyl_x /= np.linalg.norm(cyl_x)
@@ -203,7 +247,7 @@ class TreeMetadata:
             cyl_lengths[i] = cyl.length
             cyl_ids[i] = cyl.cylinder_id
             # assert np.isclose(np.dot(cyl_x, cyl_z), 0.0, atol=1e-9), "Projected vector is not perpendicular to axis"
-        
+
         # For each cylinder, find matching face indices by color, compute theta and t_val
         for i, cyl_rgb in enumerate(cyl_rgb_packed):
             matching_face_indices = np.where(original_face_rgb_packed == cyl_rgb)[0]
@@ -251,8 +295,9 @@ class TreeMetadata:
                 )
                 faces.append(face)
                 face_id_counter += 1
-            
+
         return faces
+
 
 def main():
     # tree_meta = TreeMetadata(namespace="lpy", tree_id=0, tree_type="Envy")

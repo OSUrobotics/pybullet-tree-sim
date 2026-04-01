@@ -1,8 +1,22 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pybullet_tree_sim.robot import Robot
+
 from pybullet_tree_sim.sensors.optical_sensor import OpticalSensor
-import pybullet_tree_sim.utils.camera_helpers as ch
+from pybullet_tree_sim.utils import camera_helpers as ch
+from pybullet_tree_sim.utils.pyb_utils import PyBUtils
+from pybullet_utils import bullet_client as bc
 
 import numpy as np
+
+import logging
+import pybullet_tree_sim.utils.logging_conf
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 
 class RGBCamera(OpticalSensor):
@@ -37,7 +51,7 @@ class RGBCamera(OpticalSensor):
 
         return
 
-    def get_camera_intrinsics(self) -> dict:  # TODO: change to *args ?
+    def get_optical_intrinsics(self) -> dict:  # TODO: change to *args ?
         """Convert depth sensor parameters to standard camera intrinsics.
         :return: Dict with camera intrinsics. Keys -- fx, fy, cx, cy, width, height, znear, zfar
         :rtype: dict
@@ -63,9 +77,13 @@ class RGBCamera(OpticalSensor):
             )
         )
 
+    def read(self, robot: Robot, pbclient: bc.BulletClient):
+        """Read data from the RGB camera sensor."""
+        # Implementation for reading data from the RGB camera
+        pass
+
 
 def main():
-    from pybullet_tree_sim.utils.pyb_utils import PyBUtils
     import pprint as pp
 
     pbutils = PyBUtils(renders=False)

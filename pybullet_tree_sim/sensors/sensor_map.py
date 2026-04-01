@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from __future__ import annotations
 from pybullet_tree_sim.sensors.depth_camera import DepthCamera
 from pybullet_tree_sim.sensors.lidar import Lidar
 from pybullet_tree_sim.sensors.rgb_camera import RGBCamera

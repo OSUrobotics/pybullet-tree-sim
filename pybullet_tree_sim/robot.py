@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-from pybullet_tree_sim.sensors.depth_camera import DepthCamera
-from pybullet_tree_sim.sensors.optical_sensor import OpticalSensor
-from pybullet_tree_sim.sensors.sensor import Sensor
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pybullet_tree_sim.sensors.sensor import Sensor
 from pybullet_tree_sim.sensors.sensor_map import SENSOR_TYPE_MAP
-from pybullet_tree_sim.sensors.time_of_flight import TimeOfFlight
 from pybullet_tree_sim.utils.pyb_utils import PyBUtils
 import pybullet_tree_sim.utils.camera_helpers as ch
 import pybullet_tree_sim.utils.xacro_utils as xutils
@@ -21,17 +22,23 @@ from pathlib import Path
 import pybullet
 import os
 import time
+import tempfile
 
-from zenlog import log
 import pprint as pp
 from scipy.spatial.transform import Rotation
+
+import logging
+import pybullet_tree_sim.utils.logging_conf
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 
 class Robot:
 
     _robot_configs_path = os.path.join(CONFIG_PATH, "robot")
     _robot_xacro_path = os.path.join(URDF_PATH, "robot", "robot.urdf.xacro")
-    _urdf_tmp_path = os.path.join(URDF_PATH, "tmp")
+    # _urdf_tmp_path = os.path.join(URDF_PATH, "tmp")
 
     def __init__(
         self,
@@ -60,6 +67,9 @@ class Robot:
             else init_joint_angles
         )
 
+        # Temporary directory for URDF
+        self._urdf_tmp_dir = tempfile.mkdtemp(prefix="pybullet_tree_sim_robot_")
+
         # Robot setup
         self.robot = None
 
@@ -83,6 +93,7 @@ class Robot:
 
         # Joints
         self.joints = self._get_joints()
+        # logger.info(f"Robot joints: {pp.pformat(self.joints)}")
         self.control_joints, self.control_joint_idxs = self._assign_control_joints(self.joints)
         self.reset_robot()
 
@@ -173,7 +184,7 @@ class Robot:
                     f'filename="{ur_absolute_mesh_path}',
                 )
         # Save the generated URDF
-        self.robot_urdf_path = os.path.join(self._urdf_tmp_path, "robot.urdf")
+        self.robot_urdf_path = os.path.join(self._urdf_tmp_dir, "robot.urdf")
         xutils.save_urdf(robot_urdf, urdf_path=self.robot_urdf_path)
         return
 
@@ -214,7 +225,7 @@ class Robot:
     def _get_joints(self) -> dict:
         """Return a dict of joint information for the robot"""
         joints = {}
-
+        self.base_index = 0
         for i in range(self.num_joints):
             info = self.pbclient.getJointInfo(self.robot, i)
             joint_name = info[1].decode("utf-8")
@@ -230,7 +241,9 @@ class Robot:
                     }
                 }
             )
-        # log.warn(pp.pformat(joints))
+
+        self.end_effector_index = 21  # TODO: Get dynamically
+
         return joints
 
     def _assign_control_joints(self, joints: dict) -> tuple[list]:
@@ -244,10 +257,9 @@ class Robot:
             if joint_info["type"] in (0, 1):  # (revolute, prismatic)
                 control_joints.append(joint)
                 control_joint_idxs.append(joint_info["id"])
-
-                # self.joint_upper_limits,
-                # self.joint_lower_limits,
-                # self.joint_ranges,  # ,
+                self.control_joint_lower_limits.append(joint_info["lower_limit"])
+                self.control_joint_upper_limits.append(joint_info["upper_limit"])
+                self.control_joint_ranges.append(joint_info["upper_limit"] - joint_info["lower_limit"])
 
         return control_joints, control_joint_idxs
 
@@ -297,11 +309,9 @@ class Robot:
         return tool0_link_idx
 
     def _get_sensor(self, sensor_type: str, sensor_model: str, *args, **kwargs) -> Sensor:
-        sensor_type.lower().strip()
-        sensor_model.lower().strip()
         return SENSOR_TYPE_MAP[sensor_type](
-            sensor_type=sensor_type,
-            sensor_model=sensor_model,
+            sensor_type=sensor_type.lower().strip(),
+            sensor_model=sensor_model.lower().strip(),
             pbclient=self.pbclient,
             *args,
             **kwargs,
@@ -428,17 +438,17 @@ class Robot:
 
     def calculate_ik(self, position, orientation):
         """Calculates joint angles from end effector position and orientation using inverse kinematics"""
-
         joint_angles = self.pbclient.calculateInverseKinematics(
             bodyUniqueId=self.robot,
             endEffectorLinkIndex=self.end_effector_index,
             targetPosition=position,
             targetOrientation=orientation,
             jointDamping=[0.01] * len(self.control_joints),
-            upperLimits=self.joint_upper_limits,
-            lowerLimits=self.joint_lower_limits,
-            jointRanges=self.joint_ranges,  # , restPoses=self.init_joint_angles
+            upperLimits=self.control_joint_upper_limits,
+            lowerLimits=self.control_joint_lower_limits,
+            jointRanges=self.control_joint_ranges,  # , restPoses=self.init_joint_angles
         )
+        # print(self.control_joint_ranges)
         return joint_angles
 
     def calculate_jacobian(self):
@@ -469,48 +479,6 @@ class Robot:
         dls_inv_jacobian = jacobian.T @ damped_matrix_inv
         joint_velocities = dls_inv_jacobian @ end_effector_velocity
         return joint_velocities, jacobian
-
-    # TODO: Make camera a separate class?
-    def create_camera_transform(self, world_position, world_orientation, camera: OpticalSensor) -> np.ndarray:
-        """Create rotation matrix for camera"""
-        base_offset_tf = np.identity(4)
-
-        ee_transform = np.identity(4)
-        ee_rot_mat = np.array(self.pbclient.getMatrixFromQuaternion(world_orientation)).reshape(3, 3)
-
-        ee_transform[:3, :3] = ee_rot_mat
-        ee_transform[:3, 3] = world_position
-
-        tilt_tf = np.identity(4)
-        pan_tf = np.identity(4)
-        if camera is None:
-            tilt = 0
-            pan = 0
-        else:
-            tilt = camera.tilt
-            pan = camera.tilt
-            base_offset_tf[:3, 3] = camera.xyz_offset
-
-        tilt_rot = np.array(
-            [
-                [1, 0, 0],
-                [0, np.cos(tilt), -np.sin(tilt)],
-                [0, np.sin(tilt), np.cos(tilt)],
-            ]
-        )
-        tilt_tf[:3, :3] = tilt_rot
-
-        pan_rot = np.array(
-            [
-                [np.cos(pan), 0, np.sin(pan)],
-                [0, 1, 0],
-                [-np.sin(pan), 0, np.cos(pan)],
-            ]
-        )
-        pan_tf[:3, :3] = pan_rot
-
-        tf = ee_transform @ pan_tf @ tilt_tf @ base_offset_tf
-        return tf
 
     def set_collision_filter(self, robot_collision_filter_idxs) -> None:
         """Disable collision between pruner and arm"""
@@ -609,92 +577,6 @@ class Robot:
             for j in range(self.num_joints):
                 self.pbclient.setCollisionFilterPair(self.robot, i, j, 0, 1)
         return
-
-    # TODO: Better types for getCameraImage
-    def get_view_mat_at_curr_pose(self, camera) -> np.ndarray:
-        """Get view matrix at current pose"""
-        # tf_id = camera.tf_id
-        # log.error(camera.tf_frame)
-        # log.error(camera.tf_id)
-        pos, orientation = self.get_current_pose(camera.tf_id)
-        # log.debug(f"{camera.tf_frame} Pose: {pos}, Orientation: {Rotation.from_quat(orientation).as_euler('xyz')}")
-
-        camera_tf = self.create_camera_transform(pos, orientation, camera)
-
-        # Initial vectors
-        camera_vector = np.array([0, 0, 1]) @ camera_tf[:3, :3].T  #
-        up_vector = np.array([0, -1, 0]) @ camera_tf[:3, :3].T  #
-
-        # log.debug(f"cam vec, up vec:\n{camera_vector}, {up_vector}")
-
-        view_matrix = self.pbclient.computeViewMatrix(
-            cameraEyePosition=camera_tf[:3, 3],
-            cameraTargetPosition=camera_tf[:3, 3] + 0.1 * camera_vector,
-            cameraUpVector=up_vector,
-        )
-        return view_matrix
-
-    def get_view_mat_by_id_at_curr_pose(self, idx) -> np.ndarray:
-        pos, orientation = self.get_current_pose(idx)
-        camera_tf = self.create_camera_transform(pos, orientation, camera=None)
-        # log.debug(f"End effector Pose: {pos}, Orientation: {Rotation.from_quat(orientation).as_euler('xyz')}")
-        # log.debug(f"camera_tf:\n{camera_tf}")
-        # Initial vectors
-        camera_vector = np.array([0, 0, 1]) @ camera_tf[:3, :3].T
-        up_vector = np.array([0, -1, 0]) @ camera_tf[:3, :3].T
-
-        # log.debug(f"camera_vector: {camera_vector}")
-        # log.debug(f"up_vector: {up_vector}")
-
-        view_matrix = self.pbclient.computeViewMatrix(
-            cameraEyePosition=camera_tf[:3, 3],
-            cameraTargetPosition=camera_tf[:3, 3] + 0.1 * camera_vector,
-            cameraUpVector=up_vector,
-        )
-        # log.warn(np.asarray(view_matrix).reshape((4,4), order="F"))
-        return view_matrix
-
-    def get_rgbd_at_cur_pose(self, camera, type, view_matrix) -> Tuple:
-        """Get RGBD image at current pose
-        @param camera (Camera): Camera object
-        @param type (str): either 'robot' or 'viz'
-        @param view_matrix (tuple): 16x1 tuple representing the view matrix
-
-        @return (rgb, depth) (tuple): RGB and depth images
-        """
-        rgbd = self.get_image_at_curr_pose(camera, type, view_matrix)
-        rgb, depth = ch.seperate_rgbd_rgb_d(rgbd, height=camera.depth_height, width=camera.depth_width)
-        depth = depth.astype(np.float32)
-        depth = PyBUtils.linearize_depth(depth, camera.far_val, camera.near_val)
-
-        return rgb, depth
-
-    def get_image_at_curr_pose(self, camera, type, view_matrix=None) -> list:
-        """Take the current pose of the sensor and capture an image
-        TODO: Add support for different types of sensors? For now, full rgbd
-        TOOD: Move sensor/viz view to different methods, viz to pruning env?"""
-        if type == "sensor":
-            if view_matrix is None:
-                raise ValueError("view_matrix cannot be None for sensor view")
-            return self.pbclient.getCameraImage(
-                width=camera.depth_width,  # TODO: how to work with depth + RGB?
-                height=camera.depth_height,
-                viewMatrix=view_matrix,
-                projectionMatrix=camera.depth_proj_mat,  # TODO: ^ same
-                renderer=self.pbclient.ER_BULLET_HARDWARE_OPENGL,
-                flags=self.pbclient.ER_NO_SEGMENTATION_MASK,
-                lightDirection=[1, 1, 1],
-            )
-        elif type == "viz":
-            return self.pbclient.getCameraImage(
-                width=camera.depth_width,
-                height=camera.depth_height,
-                viewMatrix=self.viz_view_matrix,
-                projectionMatrix=self.viz_proj_matrix,
-                renderer=self.pbclient.ER_BULLET_HARDWARE_OPENGL,
-                flags=self.pbclient.ER_NO_SEGMENTATION_MASK,
-                lightDirection=[1, 1, 1],
-            )
 
     # def get_camera_location(
     #     self, camera: Camera

@@ -1,5 +1,5 @@
 model: "vl53l8cx"
-data_type: "d"
+data_type: "depth"
 mass: 0.0007 # kg
 dimensions:
   shape: box
@@ -8,10 +8,10 @@ dimensions:
   z: 0.00254
 depth:
   dfov: 65.0
-  near_plane: 0.03
-  far_plane: 3.4
-  width: 640
-  height: 480
+  z_near: 0.03
+  z_far: 3.4
+  width: 8
+  height: 8
   sensing_unit_offset:
     x: 0.0001
     y: -0.001695
@@ -19,3 +19,6 @@ depth:
     roll: 0.0
     pitch: 0.0
     yaw: -1.57079632679
+data_rate_hz: 15
+upsample: true # upsample the image to deal with low-resolution and avoid color smearing from render.
+upsample_factor: 9

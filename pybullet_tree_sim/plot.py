@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 import plotly.graph_objects as go
 import modern_robotics as mr
-from zenlog import log
 import numpy as np
 import pprint as pp
+
+import logging
+import pybullet_tree_sim.utils.logging_conf
+
+logger = logging.getLogger(__name__)
 
 
 def debug_sensor_world_data(data):

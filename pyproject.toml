@@ -2,13 +2,11 @@
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-# [tool.hatch.metadata]
-# allow-direct-references = true
+[tool.hatch.build.targets.wheel]
+packages = ["pybullet_tree_sim"]
 
-# [tool.hatch.build.hooks.custom]
-# path = "pybullet_tree_sim/utils/mesh_downloader.py"
-
-
+[tool.hatch.build.targets.wheel.force-include]
+"pybullet_tree_sim/meshes" = "pybullet_tree_sim/meshes"
 
 [project]
 name = "pybullet_tree_sim"
@@ -28,6 +26,7 @@ requires-python = ">=3.9"
 dependencies = [
     "gymnasium",
     "modern_robotics",
+    "msgspec",
     "numpy==1.26.4",
     "nptyping",
     "opencv-python",
@@ -40,8 +39,4 @@ dependencies = [
     "scikit-image",
     'tqdm',
     "xacro",
-    "zenlog",
 ]
-
-# [project.scripts]
-# mesh_downloader = 'pybullet_tree_sim.utils.mesh_downloader:main'

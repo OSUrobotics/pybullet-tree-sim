@@ -4,6 +4,9 @@ from __future__ import annotations
 """
 Author (s): Abhinav Jain, Luke Strohbehn
 """
+# from pybullet_tree_sim.camera import Camera
+# from pybullet_tree_sim.utils.camera_helpers import get_fov_from_dfov
+import logging
 import os
 from typing import List, Tuple
 
@@ -13,16 +16,14 @@ from nptyping import NDArray
 from pybullet_utils import bullet_client as bc
 from scipy.constants import g as grav
 
-from pybullet_tree_sim import MESHES_PATH, URDF_PATH, TEXTURES_PATH
+import pybullet_tree_sim.utils.logging_conf
+from pybullet_tree_sim import MESHES_PATH, TEXTURES_PATH, URDF_PATH
 
-# from pybullet_tree_sim.camera import Camera
-# from pybullet_tree_sim.utils.camera_helpers import get_fov_from_dfov
-
-from zenlog import log
+logger = logging.getLogger(__name__)
 
 
 class PyBUtils:
-    def __init__(self, renders: bool = False) -> None:
+    def __init__(self, renders: bool = False, time_step_interval: float = 1 / 240) -> None:
         self.viz_view_matrix = None
         self.viz_proj_matrix = None
         self.renders = renders
@@ -30,7 +31,7 @@ class PyBUtils:
         # self.cam_width = cam_width
         self.near_val = 0.02
         self.far_val = 4.0
-        self.step_time = 1 / 4
+        self.time_step_interval = time_step_interval
 
         # Debug parameters
         self.debug_items_step = []
@@ -47,7 +48,7 @@ class PyBUtils:
         else:
             self.pbclient = bc.BulletClient(connection_mode=pybullet.DIRECT)
 
-        self.pbclient.setTimeStep(self.step_time)
+        self.pbclient.setTimeStep(self.time_step_interval)
         # self.enable_gravity()
         self.disable_gravity()
         self.pbclient.setRealTimeSimulation(False)
@@ -65,12 +66,12 @@ class PyBUtils:
 
     def disable_gravity(self):
         self.pbclient.setGravity(0, 0, 0)
-        log.info("Gravity disabled.")
+        logger.info("Gravity disabled.")
         return
 
     def enable_gravity(self):
         self.pbclient.setGravity(0, 0, -grav)
-        log.info(f"Gravity enabled ({-grav} m/s^2).")
+        logger.info(f"Gravity enabled ({-grav} m/s^2).")
         return
 
     def create_wall_with_texture(
@@ -157,7 +158,7 @@ class PyBUtils:
         try:
             depth_linearized = far_val * near_val / (far_val - (far_val - near_val) * depth)
         except ZeroDivisionError:
-            log.warning("Encountered division by 0 in depth linearization.")
+            logger.warning("Encountered division by 0 in depth linearization.")
             depth_linearized = None
         return depth_linearized
 

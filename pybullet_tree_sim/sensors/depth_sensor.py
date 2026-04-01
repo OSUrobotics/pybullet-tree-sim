@@ -1,9 +1,20 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pybullet_tree_sim.robot import Robot
 from pybullet_tree_sim.sensors.optical_sensor import OpticalSensor
 import pybullet_tree_sim.utils.camera_helpers as ch
+from pybullet_utils import bullet_client as bc
+
 import numpy as np
 
-from typing import Union
+import logging
+import pybullet_tree_sim.utils.logging_conf
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 
 class DepthSensor(OpticalSensor):
@@ -12,40 +23,46 @@ class DepthSensor(OpticalSensor):
         pbclient = kwargs.get("pbclient")
 
         depth_params = self.params["depth"]
-
-        # Get depth sensor parameters
         self.depth_width = depth_params["width"]
         self.depth_height = depth_params["height"]
-        # Some optical sensors only provide diagonal field of view, get horizontal and vertical from diagonal
         try:
             self.depth_vfov = depth_params["vfov"]
             self.depth_hfov = depth_params["hfov"]
         except KeyError:
             self.depth_dfov = depth_params["dfov"]
-            self.depth_hfov, self.depth_vfov = ch.get_fov_from_dfov(
-                self.depth_width, self.depth_height, self.depth_dfov
-            )
-        self.near_val = depth_params["near_plane"]
-        self.far_val = depth_params["far_plane"]
+            self.depth_hfov, self.depth_vfov = ch.get_fov_from_dfov(self.depth_width, self.depth_height, self.depth_dfov)
+        self.z_near = depth_params["z_near"]
+        self.z_far = depth_params["z_far"]
 
-        # Pixel coordinates, indexed by depth_width, depth_height, nx1 array COLUMN MAJOR
-        self.depth_pixel_coords = np.array(list(np.ndindex((self.depth_width, self.depth_height))), dtype=int)
-        # Film coordinates projected to [-1, 1], nx1 array COLUMN MAJOR
-        self.depth_film_coords = (
-            2
-            * (self.depth_pixel_coords + np.array([0.5, 0.5]) - np.array([self.depth_width / 2, self.depth_height / 2]))
-            / np.array([self.depth_width, self.depth_height])
+        depth_params = self.params["depth"]
+        self.depth_pixel_coords = ch.get_pixel_coords(
+            width=depth_params["width"],
+            height=depth_params["height"],
         )
+        self.depth_film_coords = ch.get_film_coords(
+            width=depth_params["width"],
+            height=depth_params["height"],
+        )
+        # self.depth_proj_mat = ch.get_projection_matrix(
+        #     width=depth_params["width"],
+        #     height=depth_params["height"],
+        #     z_near=depth_params["z_near"],
+        #     z_far=depth_params["z_far"],
+        #     hfov=depth_params.get("hfov", None),
+        #     vfov=depth_params.get("vfov", None),
+        #     dfov=depth_params.get("dfov", None),
+        # )
+        
         # Depth projection matrix from camera intrinsics
         self.depth_proj_mat = pbclient.computeProjectionMatrixFOV(
             fov=self.depth_vfov,
             aspect=(self.depth_width / self.depth_height),
-            nearVal=self.near_val,
-            farVal=self.far_val,
+            nearVal=self.z_near,
+            farVal=self.z_far,
         )
         return
 
-    def get_camera_intrinsics(self) -> dict:  # TODO: change to *args ?
+    def get_optical_intrinsics(self) -> dict:  # TODO: change to *args ?
         """Convert depth sensor parameters to standard camera intrinsics.
         :return: Dict with camera intrinsics. Keys -- fx, fy, cx, cy, width, height, znear, zfar
         :rtype: dict
@@ -66,10 +83,15 @@ class DepthSensor(OpticalSensor):
                 cy=cy,
                 width=self.depth_width,
                 height=self.depth_height,
-                znear=self.near_val,
-                zfar=self.far_val,
+                znear=self.z_near,
+                zfar=self.z_far,
             )
         )
+
+    # def read(self, robot: Robot, pbclient: bc.BulletClient):
+    #     """Read data from the depth sensor."""
+    #     # Implementation for reading data from the depth sensor
+    #     pass
 
 
 def main():

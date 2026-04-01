@@ -1,11 +1,26 @@
 #!/usr/bin/env python3
-from abc import ABC
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pybullet_tree_sim.robot import Robot
+
+from abc import ABC, abstractmethod
 from pybullet_tree_sim import CONFIG_PATH
-import pybullet_tree_sim.utils.yaml_utils as yutils
+from pybullet_tree_sim.sensors import sensor_types as st
+from pybullet_tree_sim.utils.pyb_utils import PyBUtils
+from pybullet_tree_sim.utils import yaml_utils as yutils
+from pybullet_utils import bullet_client as bc
+
 
 import numpy as np
 import os
-from zenlog import log
+
+import logging
+import pybullet_tree_sim.utils.logging_conf
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 
 class Sensor(ABC):
@@ -40,6 +55,11 @@ class Sensor(ABC):
         self.sensor_path: str = os.path.join(CONFIG_PATH, "sensors", self.sensor_type)
         self.params: dict = self._load_params()
 
+        # Intrinsic attributes
+        self.data_rate_hz: float = self.params["data_rate_hz"]
+        self.data_type: st.DataType = st.parse_data_type(self.params["data_type"])
+        self.modalities: set = st.data_type_modalities(self.data_type)
+
         # Extrinsic attributes
         self.tf_frame: str = tf_frame
         self.tf_id: int = tf_id
@@ -47,13 +67,13 @@ class Sensor(ABC):
         self.rpy_offset: np.ndarray = np.zeros(3, dtype=float)
 
         # Physical attributes
-        self.mass: float = self.params["mass"]
-        dimensions: dict = self.params["dimensions"]
-        self.shape: str = dimensions["shape"]
+        self.mass: float = self.params.get("mass", None)
+        dimensions: dict = self.params.get("dimensions", {})
+        self.shape: str = dimensions.get("shape", None)
         self.dimensions: tuple[float] = (
-            dimensions["x"],
-            dimensions["y"],
-            dimensions["z"],
+            dimensions.get("x", None),
+            dimensions.get("y", None),
+            dimensions.get("z", None),
         )
         return
 
@@ -68,7 +88,7 @@ class Sensor(ABC):
         sensor_config_path = os.path.join(self.sensor_path, f"{self.model}.yaml")
 
         if os.path.exists(sensor_config_path):
-            log.info(f"Loading sensor configuration from {sensor_config_path}")
+            logger.info(f"Loading sensor configuration from {sensor_config_path}")
             config_content = yutils.load_yaml(sensor_config_path)
             if config_content is not None:
                 return config_content
@@ -76,6 +96,14 @@ class Sensor(ABC):
                 raise Exception(f"Failed to load sensor configiguration from {sensor_config_path}")
         else:
             raise FileNotFoundError(f"Sensor configuration not found at {sensor_config_path}")
+
+    @abstractmethod
+    def read(self, robot: Robot, pbclient: bc.BulletClient, **kwargs) -> dict:
+        """Abstract method to read data from the sensor.
+
+        :raises NotImplementedError: If raised, the method is not implemented in the subclass.
+        """
+        raise NotImplementedError("The read method must be implemented by the subclass.")
 
 
 def main():

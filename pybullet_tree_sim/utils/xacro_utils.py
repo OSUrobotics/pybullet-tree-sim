@@ -3,7 +3,10 @@ from io import TextIOWrapper
 import xacro
 import xml.dom.minidom
 
-from zenlog import log
+import logging
+import pybullet_tree_sim.utils.logging_conf
+
+logger = logging.getLogger(__name__)
 
 
 def load_urdf_from_xacro(xacro_path: str, mappings: dict | None = None) -> xml.dom.minidom.Document | TextIOWrapper:
@@ -15,5 +18,5 @@ def load_urdf_from_xacro(xacro_path: str, mappings: dict | None = None) -> xml.d
 def save_urdf(urdf_content: str, urdf_path: str) -> None:
     with open(urdf_path, "w") as f:
         f.write(urdf_content)
-    log.info(f"Saved URDF to file '{urdf_path}'.")
+    logger.info(f"Saved URDF to file '{urdf_path}'.")
     return

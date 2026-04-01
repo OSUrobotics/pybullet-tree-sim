@@ -19,10 +19,15 @@ from pybullet_tree_sim import URDF_PATH, MESHES_PATH
 from pybullet_tree_sim.utils.pyb_utils import PyBUtils
 from pybullet_tree_sim.utils.mesh_objects import MeshObjects
 import pybullet_tree_sim.utils.xacro_utils as xutils
-from pybullet_tree_sim.tree_metadata import TreeMetadata
+from pybullet_tree_sim.tree_metadata import TreeMetadata, Face, Cylinder, Limb
 import tempfile
 
-from zenlog import log
+
+import logging
+import pybullet_tree_sim.utils.logging_conf
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 
 class TreeException(Exception):
@@ -61,11 +66,11 @@ class Tree:
         seed: int | None = None,
     ) -> None:
         # Set up temporary directory for tree files
-        self.temp_dir = tempfile.TemporaryDirectory()
-        log.info(f"Creating Tree object '{namespace}_{tree_type}_{tree_id}'.")
+        self.temp_dir = tempfile.mkdtemp(prefix="pybullet_tree_sim_tree_")
+        logger.info(f"Creating Tree object '{namespace}_{tree_type}_{tree_id}'.")
 
         # PyBullet
-        self.pbclient = pbutils.pbclient
+        self.pbutils: PyBUtils = pbutils
 
         # Set seed
         if seed is not None:  # TODO: Log this seed for reproducibility
@@ -92,23 +97,26 @@ class Tree:
 
         # Original raw mesh
         self.raw_mesh = MeshObjects.load_mesh(self.ply_mesh_path)
+        # Mesh with unique face colors
+        self.recolored_mesh = MeshObjects.color_and_convert_ply_to_obj(
+            ply_mesh_path=self.ply_mesh_path, obj_mesh_path=self.obj_mesh_path
+        )
 
         # Tree metadata
+        logger.info(f"Loading tree metadata from '{self.mesh_metadata_path}'.")
         tree_metadata = TreeMetadata(
             tree_id=self.tree_id,
             tree_type=self.tree_type,
             namespace=self.tree_namespace,
             tree_metadata_path=self.mesh_metadata_path,
-            tree_mesh=self.raw_mesh,
+            # tree_mesh=self.raw_mesh,
         )
         self.limbs = tree_metadata.limbs
         self.cylinders = tree_metadata.cylinders
-
-        # Mesh with unique face colors
-        self.recolored_mesh = MeshObjects.color_and_convert_ply_to_obj(
-            ply_mesh_path=self.ply_mesh_path, obj_mesh_path=self.obj_mesh_path
-        )
         self.faces = tree_metadata.get_faces(original_mesh=self.raw_mesh, recolored_mesh=self.recolored_mesh)
+        logger.info(
+            f"Loaded {len(self.limbs)} limbs, {len(self.cylinders)} cylinders, and {len(self.faces)} faces for tree '{self.id_str}'."
+        )
 
         # URDF
         self.load_tree_urdf(scale=scale, parent=parent)
@@ -124,6 +132,8 @@ class Tree:
             new_orientation = orientation
         self.pos = new_pos
         self.orientation = new_orientation
+
+        # self.add_cylinder_coordinate_frames()
         return
 
     def load_tree_urdf(
@@ -133,16 +143,19 @@ class Tree:
         position: str = "0.0 0.0 0.0",
         orientation: str = "0.0 0.0 0.0",
         save_urdf: bool = True,
-        regenerate_urdf: bool = False,  # TODO: make save/regenerate work well together. Will need to add delete URDF function
     ) -> str:
         """Load a tree URDF from a given path or generate a tree URDF from a xacro file. If content is generated, by default saves the content to /urdf/trees/<tree_type>/generated Returns the URDF content.
 
-        Returns
-        -------
-            None
+        :param scale: Scale of the tree
+        :param parent: Parent link of the tree in the URDF
+        :param position: Position of the tree in the URDF
+        :param orientation: Orientation of the tree in the URDF
+        :param save_urdf: Whether to save the generated URDF to file
+        :return: URDF content as string
+        :rtype: str
         """
         if not os.path.exists(self.urdf_path):
-            log.info(f"Could not find file '{self.urdf_path}'. Generating URDF from xacro.")
+            logger.info(f"Could not find file '{self.urdf_path}'. Generating URDF from xacro.")
 
             if not os.path.isdir(Tree._tree_generated_urdf_path):
                 os.mkdir(Tree._tree_generated_urdf_path)
@@ -162,7 +175,7 @@ class Tree:
                 xutils.save_urdf(urdf_content=urdf_content, urdf_path=self.urdf_path)
         else:
             urdf_content = xutils.load_urdf_from_xacro(xacro_path=self.urdf_path).toprettyxml()
-            log.info(f"Loaded URDF from file '{self.urdf_path}'.")
+            logger.info(f"Loaded URDF from file '{self.urdf_path}'.")
 
         return urdf_content
 
@@ -182,12 +195,30 @@ class Tree:
         vertex_pos = np.array(vertex[0:3]) * self.scale
         vertex_orientation = [0, 0, 0, 1]  # Dont care about orientation
 
-        vertex_w_transform: tuple[tuple, tuple] = self.pbclient.multiplyTransforms(
+        vertex_w_transform: tuple[tuple, tuple] = self.pbutils.pbclient.multiplyTransforms(
             self.pos, self.orientation, vertex_pos, vertex_orientation
         )
         # vertex_w_transform = np.concatenate((final_position, final_orientation))
 
         return (np.array(vertex_w_transform[0]), vertex[3])
+
+    def get_face_from_rgb(self, rgb: ArrayLike) -> Face:
+        """Get the face corresponding to a given RGB color.
+
+        :param rgb: RGB color as an array-like of 3 integers
+        :return: Face object corresponding to the RGB color
+        :rtype: Face
+        """
+        rgb_tuple = (int(rgb[0]), int(rgb[1]), int(rgb[2]))
+        for face in self.faces:
+            if face.color == rgb_tuple:
+                return face
+        raise TreeException(f"No face found with RGB color {rgb_tuple}.")
+
+    def add_cylinder_coordinate_frames(self) -> None:
+        for cylinder in self.cylinders:
+            self.pbutils.visualize_rot_mat(rot_mat=cylinder.rot_mat, pos=cylinder.centroid)
+        return
 
 
 def main():

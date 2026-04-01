@@ -52,10 +52,49 @@ def get_fov_from_dfov(
     return (np.rad2deg(fov_w), np.rad2deg(fov_h))
 
 
-# def get_pyb_proj_mat(vfov: float, aspect: float, nearVal: float, farVal: float):
-#     return pbutils.pbclient.computeProjectionMatrixFOV(
-#         fov=vfov, aspect=(self.depth_width / self.depth_height), nearVal=near_val, farVal=far_val
-#     )
+
+def get_pixel_coords(width: int, height: int) -> np.ndarray:
+    """Get pixel coordinates for a camera image of given width and height.
+    :param width: pixel width of the camera image
+    :param height: pixel height of the camera image
+    :return: nx2 array of pixel coordinates in COLUMN MAJOR order
+    """
+    # Pixel coordinates, indexed by depth_width, depth_height, nx1 array COLUMN MAJOR
+    pixel_coords = np.array(list(np.ndindex((width, height))), dtype=int)
+    return pixel_coords
+
+
+def get_film_coords(width: int, height: int) -> np.ndarray:
+    """Get film coordinates for a camera image of given width and height.
+    Film coordinates are the pixel coordinates projected to [-1, 1] range, with the origin at the center of the image.
+    :param width: pixel width of the camera image
+    :param height: pixel height of the camera image
+    :return: nx2 array of film coordinates in COLUMN MAJOR order
+    """
+    # Film coordinates projected to [-1, 1], nx1 array COLUMN MAJOR
+    pixel_coords = get_pixel_coords(width=width, height=height)
+    film_coords = (
+        2
+        * (pixel_coords + np.array([0.5, 0.5]) - np.array([width / 2, height / 2]))
+        / np.array([width, height])
+    )
+    return film_coords
+    
+    
+def downsample_rgbd(rgb, depth, width, height, factor):
+    """Downsample an RGBD image by selecting the middle pixel of each bin."""
+    mid = factor // 2
+
+    new_h = height // factor
+    new_w = width  // factor
+
+    # Build row/col indices of the middle pixel in each bin
+    row_indices = np.arange(new_h) * factor + mid  # shape (new_h,)
+    col_indices = np.arange(new_w) * factor + mid  # shape (new_w,)
+    
+    rgb_downsampled = rgb[np.ix_(row_indices, col_indices)]
+    depth_downsampled = depth[np.ix_(row_indices, col_indices)]
+    return rgb_downsampled, depth_downsampled
 
 if __name__ == "__main__":
     camera_width = 64

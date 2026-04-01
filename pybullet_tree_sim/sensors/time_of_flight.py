@@ -1,12 +1,27 @@
 #!/usr/bin/env python3
-"""Base class for a ToF Camera. Inherits functionality from DepthSensor class"""
-from pybullet_tree_sim.sensors.depth_sensor import DepthSensor
-from pybullet_tree_sim.utils import camera_helpers
-from pybullet_tree_sim.utils.pyb_utils import PyBUtils
-import pybullet_tree_sim.utils.yaml_utils as yutils
+from __future__ import annotations
 
+"""Base class for a ToF Camera. Inherits functionality from DepthSensor class"""
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pybullet_tree_sim.robot import Robot
+from pybullet_tree_sim.sensors.sensor_types import Modality
+from pybullet_tree_sim.sensors.depth_sensor import DepthSensor
+# from pybullet_tree_sim.utils import camera_helpers
+from pybullet_tree_sim.utils.pyb_utils import PyBUtils
+# import pybullet_tree_sim.utils.yaml_utils as yutils
+from pybullet_utils import bullet_client as bc
+
+import numpy as np
 import os
-from zenlog import log
+
+import logging
+import pybullet_tree_sim.utils.logging_conf
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 
 class TimeOfFlight(DepthSensor):
@@ -28,6 +43,12 @@ class TimeOfFlight(DepthSensor):
         )
 
         return
+
+    def read(
+        self, robot: Robot, pbclient: bc.BulletClient, mode: Modality = Modality.DEPTH
+    ) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
+        """Read data from the ToF sensor."""
+        return super().read(robot=robot, pbclient=pbclient, mode=mode)
 
 
 def main():

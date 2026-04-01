@@ -31,8 +31,11 @@ from typing import Optional, Tuple
 from numpy.typing import ArrayLike
 from scipy.spatial.transform import Rotation
 
-from zenlog import log
-import pprint as pp
+import logging
+import pybullet_tree_sim.utils.logging_conf
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 
 class PruningEnvException(Exception):
@@ -161,9 +164,9 @@ class PruningEnv(gym.Env):
         """
         if tree:
             if self.verbose:
-                log.info("Activating tree")
+                logger.info("Activating tree")
             tree.pyb_id = self.pbutils.pbclient.loadURDF(tree.urdf_path, useFixedBase=True)
-            log.info(f"Tree {tree.id_str} activated with PyBID {tree.pyb_id}")
+            logger.info(f"Tree {tree.id_str} activated with PyBID {tree.pyb_id}")
 
             if include_support_posts:
                 self.activate_support_posts(associated_tree=tree)
@@ -178,9 +181,9 @@ class PruningEnv(gym.Env):
         """Deactivate a tree object"""
         try:
             self.pbutils.pbclient.removeBody(tree.pyb_id)
-            log.info(f"Tree {tree.id_str} with PyBID {tree.pyb_id} deactivated")
+            logger.info(f"Tree {tree.id_str} with PyBID {tree.pyb_id} deactivated")
         except Exception as e:
-            log.error(f"Error deactivating tree: {e}")
+            logger.error(f"Error deactivating tree: {e}")
         return
 
     def deactivate_tree_by_id_str(self, tree_id_str: str) -> None:
@@ -220,7 +223,7 @@ class PruningEnv(gym.Env):
             basePosition=position,
             baseOrientation=orientation,
         )
-        log.info(f"Supports and post activated with PyBID {support_post_id}")
+        logger.info(f"Supports and post activated with PyBID {support_post_id}")
         self.collision_object_ids["SUPPORT"] = support_post_id
         return
 
@@ -282,7 +285,7 @@ class PruningEnv(gym.Env):
             basePosition=position,
             baseOrientation=orientation,
         )
-        log.info(f"{shape.title()} loaded with PyBID {shape_id}")
+        logger.info(f"{shape.title()} loaded with PyBID {shape_id}")
 
         return
 
@@ -330,7 +333,7 @@ class PruningEnv(gym.Env):
 
 
 def main():
-    from pybullet_tree_sim.time_of_flight import TimeOfFlight
+    from pybullet_tree_sim.sensors.time_of_flight import TimeOfFlight
     from pybullet_tree_sim.utils.pyb_utils import PyBUtils
     from pybullet_tree_sim.robot import Robot
     import numpy as np
