@@ -60,6 +60,8 @@ class DepthSensor(OpticalSensor):
             nearVal=self.z_near,
             farVal=self.z_far,
         )
+        # logger.debug(np.array(self.depth_proj_mat).reshape(4, 4))
+        # logger.debug(self.z_far)
         return
 
     def get_optical_intrinsics(self) -> dict:  # TODO: change to *args ?

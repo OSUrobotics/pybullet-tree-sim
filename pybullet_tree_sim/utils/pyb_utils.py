@@ -153,7 +153,7 @@ class PyBUtils:
     #     return
 
     @staticmethod
-    def linearize_depth(depth: NDArray, far_val: float, near_val: float):
+    def linearize_depth(depth: NDArray, near_val: float, far_val: float) -> NDArray:
         """OpenGL returns contracted depth, linearize it"""
         try:
             depth_linearized = far_val * near_val / (far_val - (far_val - near_val) * depth)

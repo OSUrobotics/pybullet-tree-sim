@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-from nptyping import NDArray, Shape, Float
-from typing import Union, List, Tuple
+
+from typing import List, Tuple, Union
+
 import numpy as np
+from nptyping import Float, NDArray, Shape
 
 
 def compute_perpendicular_projection_vector(ab: NDArray[Shape["3, 1"], Float], bc: NDArray[Shape["3, 1"], Float]):
@@ -52,7 +54,6 @@ def get_fov_from_dfov(
     return (np.rad2deg(fov_w), np.rad2deg(fov_h))
 
 
-
 def get_pixel_coords(width: int, height: int) -> np.ndarray:
     """Get pixel coordinates for a camera image of given width and height.
     :param width: pixel width of the camera image
@@ -74,27 +75,24 @@ def get_film_coords(width: int, height: int) -> np.ndarray:
     # Film coordinates projected to [-1, 1], nx1 array COLUMN MAJOR
     pixel_coords = get_pixel_coords(width=width, height=height)
     film_coords = (
-        2
-        * (pixel_coords + np.array([0.5, 0.5]) - np.array([width / 2, height / 2]))
-        / np.array([width, height])
+        2 * (pixel_coords + np.array([0.5, 0.5]) - np.array([width / 2, height / 2])) / np.array([width, height])
     )
     return film_coords
-    
-    
+
+
 def downsample_rgbd(rgb, depth, width, height, factor):
     """Downsample an RGBD image by selecting the middle pixel of each bin."""
-    mid = factor // 2
+    new_h = int(height // factor)
+    new_w = int(width // factor)
 
-    new_h = height // factor
-    new_w = width  // factor
+    row_indices = (np.arange(new_h) * factor + factor / 2).astype(int)
+    col_indices = (np.arange(new_w) * factor + factor / 2).astype(int)
 
-    # Build row/col indices of the middle pixel in each bin
-    row_indices = np.arange(new_h) * factor + mid  # shape (new_h,)
-    col_indices = np.arange(new_w) * factor + mid  # shape (new_w,)
-    
-    rgb_downsampled = rgb[np.ix_(row_indices, col_indices)]
-    depth_downsampled = depth[np.ix_(row_indices, col_indices)]
+    # Use sequential indexing: select rows first, then columns
+    rgb_downsampled = rgb[row_indices][:, col_indices]
+    depth_downsampled = depth[row_indices][:, col_indices]
     return rgb_downsampled, depth_downsampled
+
 
 if __name__ == "__main__":
     camera_width = 64

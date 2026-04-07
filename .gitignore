@@ -179,3 +179,5 @@ meshes*/
 *.obj
 open3d_id.py
 pywavefront_id.py
+
+docs/

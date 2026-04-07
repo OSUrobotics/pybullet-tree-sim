@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
-from dataclasses import dataclass
 import json
+import logging
 import os
 import pprint as pp
 import sys
+from dataclasses import dataclass
 
+import msgspec
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 from trimesh import Trimesh
 
-import msgspec
-
-import logging
 import pybullet_tree_sim.utils.logging_conf
 
 logger = logging.getLogger(__name__)
@@ -34,8 +33,23 @@ class Cylinder(msgspec.Struct):
     orientation: tuple[float, float, float]
     rot_mat: np.ndarray
 
+    def to_dict(self) -> dict:
+        info_dict = {
+            "limb_name": self.limb_name,
+            "limb_id": self.limb_id,
+            "cylinder_id": self.cylinder_id,
+            "color": self.color,
+            "centroid": self.centroid,
+            "radius": self.radius,
+            "length": self.length,
+            "orientation": self.orientation,
+            "rot_mat": self.rot_mat,
+        }
+        return info_dict
 
-class Face(msgspec.Struct):
+
+@dataclass
+class Face:
     vertices: list[tuple[float, float, float]]
     normal: tuple[float, float, float]
     color: tuple[int, int, int]
@@ -45,8 +59,22 @@ class Face(msgspec.Struct):
     t_val: float
     cylinder_id: int
 
+    def to_dict(self) -> dict:
+        info_dict = {
+            "vertices": self.vertices,
+            "normal": self.normal,
+            "color": self.color,
+            "id": self.face_id,
+            "id_a": self.face_id_a,
+            "theta": self.theta,
+            "t_val": self.t_val,
+            "cylinder_id": self.cylinder_id,
+        }
+        return info_dict
 
-class Limb(msgspec.Struct):
+
+@dataclass
+class Limb:
     """Logical grouping of cylinders that belong to the same limb/branch.
 
     Holds a list of Cylinder objects and convenience methods.
@@ -64,6 +92,17 @@ class Limb(msgspec.Struct):
             if c.limb_id == limb_id:
                 return c
         return None
+
+    def to_dict(self) -> dict:
+        info_dict = {
+            "name": self.name,
+            "limb_id": self.limb_id,
+            "cylinders": [cylinder.to_dict() for cylinder in self.cylinders],
+            "children": self.children,
+            "start_point": self.start_point,
+            "end_point": self.end_point,
+        }
+        return info_dict
 
 
 @dataclass
@@ -301,19 +340,45 @@ class TreeMetadata:
 
 def main():
     # tree_meta = TreeMetadata(namespace="lpy", tree_id=0, tree_type="Envy")
+    """class Cylinder(msgspec.Struct):
+    limb_name: str
+    limb_id: int
+    cylinder_id: int
+    color: tuple[int, int, int]
+    centroid: tuple[float, float, float]
+    radius: float
+    length: float
+    orientation: tuple[float, float, float]
+    rot_mat: np.ndarray"""
 
     cyl = Cylinder(
-        part_name="trunk",
-        part_id=0,
+        limb_name="trunk",
+        limb_id=0,
+        cylinder_id=0,
         color=(255, 0, 0),
         centroid=(0.0, 0.0, 0.0),
         radius=0.1,
         length=1.0,
         orientation=(0.0, 0.0, 0.0),
+        rot_mat=np.array([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]).tolist(),
     )
-    # print(cyl)
-    msg = msgspec.json.encode(cyl)
-    # print(msg)
+    print(cyl.to_dict())
+
+    face = Face(
+        vertices=[
+            (1.0, 0.0, 0.0),
+            (0.0, 2.0, 0.0),
+            (0.0, 0.0, 3.0),
+        ],
+        normal=(1.0, 0.0, 0.0),
+        color=(255, 0, 0),
+        face_id=12,
+        face_id_a=["abc123"],
+        theta=np.radians(30),
+        t_val=0.78,
+        cylinder_id=15,
+    )
+    print(face.to_dict())
     return
 
 

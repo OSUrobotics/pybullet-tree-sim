@@ -197,9 +197,13 @@ class OpticalSensor(Sensor):
             width *= self.upsample_factor
             height *= self.upsample_factor
 
-        rgb, depth = ch.seperate_rgbd_rgb_d(rgbd=rgbd, width=width, height=height)
+        rgb, depth = ch.seperate_rgbd_rgb_d(rgbd=rgbd, width=int(width), height=int(height))
         depth = depth.astype(np.float32)
-        depth = PyBUtils.linearize_depth(depth, self.z_near, self.z_far)
+        depth = PyBUtils.linearize_depth(
+            depth=depth,
+            near_val=self.z_near,
+            far_val=self.z_far
+        )
 
         # downsample if upsample is true
         if self.upsample:
@@ -232,8 +236,8 @@ class OpticalSensor(Sensor):
             if view_matrix is None:
                 raise ValueError("view_matrix cannot be None for sensor view")
             return pbclient.getCameraImage(
-                width=width,  # TODO: how to work with depth + RGB?
-                height=height,
+                width=int(width),  # TODO: how to work with depth + RGB?
+                height=int(height),
                 viewMatrix=view_matrix,
                 projectionMatrix=proj_mat,  # TODO: ^ same
                 renderer=pbclient.ER_BULLET_HARDWARE_OPENGL,
@@ -242,8 +246,8 @@ class OpticalSensor(Sensor):
             )
         elif view_type == "viz":
             return pbclient.getCameraImage(
-                width=width,
-                height=height,
+                width=int(width),
+                height=int(height),
                 viewMatrix=self.viz_view_matrix,
                 projectionMatrix=self.viz_proj_matrix,
                 renderer=pbclient.ER_BULLET_HARDWARE_OPENGL,

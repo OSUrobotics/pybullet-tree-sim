@@ -1,17 +1,20 @@
 #!/usr/bin/env python3
 # Requires: pip install trimesh pyrender numpy
-from pybullet_tree_sim import MESHES_PATH
-from pybullet_tree_sim.utils.mesh_objects import MeshObjects
-from pybullet_tree_sim.sensors.optical_sensor import OpticalSensor
-from pybullet_tree_sim.sensors.sensor_types import SensorType, DataType
-from pybullet_tree_sim.sensors.lidar import Lidar
-import trimesh
-import pyrender
-import numpy as np
+import logging
 import os
 
-import logging
+import numpy as np
+import pyrender
+import trimesh
+from scipy.constants import h
+
+import pybullet_tree_sim.utils.camera_helpers as ch
 import pybullet_tree_sim.utils.logging_conf
+from pybullet_tree_sim import MESHES_PATH
+from pybullet_tree_sim.sensors.lidar import Lidar
+from pybullet_tree_sim.sensors.optical_sensor import OpticalSensor
+from pybullet_tree_sim.sensors.sensor_types import Modality
+from pybullet_tree_sim.utils.mesh_objects import MeshObjects
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -96,15 +99,56 @@ class RenderScene:
         """Render the scene from the perspective of the given optical sensor"""
         data = {}
         for mode in sensor.modalities:
-            sensor_node = self.sensor_nodes[f"{sensor.sensor_name}_{mode}"]
+            if mode == Modality.RGB:
+                width = sensor.rgb_width
+                height = sensor.rgb_height
+            elif mode == Modality.DEPTH:
+                width = sensor.depth_width
+                height = sensor.depth_height
+
+            # Get original sensor intrinsics
             sensor_intrinsics = sensor.get_optical_intrinsics()[mode]
 
-            renderer = pyrender.OffscreenRenderer(
-                viewport_width=sensor.depth_width, viewport_height=sensor.depth_height
-            )
+            # Calculate scaled intrinsics for rendering
+            if sensor.upsample:
+                width = width * sensor.upsample_factor
+                height = height * sensor.upsample_factor
+
+                # Scale intrinsics for upsampled resolution
+                # HACK: Scale intrinsics for upsampled render
+                # When rendering at higher resolution, we scale intrinsics to match
+                # This is mathematically equivalent to rendering with a higher-density sensor
+                # TODO: Refactor to use projection matrix adjustment or viewport cropping instead
+                fx = sensor_intrinsics["fx"] * sensor.upsample_factor
+                fy = sensor_intrinsics["fy"] * sensor.upsample_factor
+                cx = sensor_intrinsics["cx"] * sensor.upsample_factor
+                cy = sensor_intrinsics["cy"] * sensor.upsample_factor
+            else:
+                fx = sensor_intrinsics["fx"]
+                fy = sensor_intrinsics["fy"]
+                cx = sensor_intrinsics["cx"]
+                cy = sensor_intrinsics["cy"]
+
+            # Update camera intrinsics in the scene for rendering
+            sensor_node_name = f"{sensor.sensor_name}_{mode}"
+            if sensor_node_name in self.sensor_nodes:
+                camera_node = self.sensor_nodes[sensor_node_name]
+                camera = camera_node.camera
+                camera.fx = fx
+                camera.fy = fy
+                camera.cx = cx
+                camera.cy = cy
+
+            renderer = pyrender.OffscreenRenderer(viewport_width=width, viewport_height=height)
             rgb, depth = renderer.render(
                 scene=self.scene, flags=pyrender.RenderFlags.FLAT | pyrender.RenderFlags.SKIP_CULL_FACES
             )
+
+            if sensor.upsample:
+                rgb, depth = ch.downsample_rgbd(
+                    rgb=rgb, depth=depth, width=width, height=height, factor=sensor.upsample_factor
+                )
+
             data[mode] = {
                 "rgb": rgb,
                 "depth": depth,
